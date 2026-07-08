@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Kook vir Jou — Recipe Finder</title>
+<meta name="theme-color" content="#1F2421">
+<meta name="description" content="Household recipe finder, Koskas pantry register and shopping lists.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -122,9 +127,10 @@
   .wake-badge{font-size:11px; color:var(--ok); font-family:'IBM Plex Mono',monospace;}
   .wake-badge.off{color:var(--warn);}
 
-  /* Rating modal */
-  #ratingModal, #leftoverModal{position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:210; display:flex; align-items:center; justify-content:center; padding:20px;}
-  #ratingModal .modal-inner, #leftoverModal .modal-inner{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:26px; max-width:420px; width:100%;}
+  /* Modals */
+  #ratingModal, #leftoverModal, #deductModal, #mealModal{position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:210; display:flex; align-items:center; justify-content:center; padding:20px; overflow-y:auto;}
+  #ratingModal .modal-inner, #leftoverModal .modal-inner, #deductModal .modal-inner, #mealModal .modal-inner{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:26px; max-width:420px; width:100%; max-height:90vh; overflow-y:auto;}
+  #deductModal .modal-inner{max-width:480px;}
   .star-row{display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;}
   .star-row .cat{font-size:13.5px; width:110px;}
   .stars{display:flex; gap:4px;}
@@ -132,6 +138,46 @@
   .stars span.on{color:var(--saffron);}
 
   footer.note{max-width:820px; margin:30px auto 0; padding:0 20px; font-size:12px; color:var(--text-dim); line-height:1.6;}
+
+  /* Order Mode / shopping list */
+  .status-pill{border:1px solid var(--line); background:var(--card-raised); color:var(--text-dim); border-radius:999px; padding:3px 10px; font-size:11px; font-family:'IBM Plex Mono',monospace; cursor:pointer; white-space:nowrap;}
+  .status-pill.required{border-color:var(--saffron-dim); color:var(--saffron);}
+  .status-pill.optional{color:var(--text-dim);}
+  .status-pill.check_pantry{border-color:var(--clay); color:var(--clay);}
+  .status-pill.already_have{border-color:var(--ok); color:var(--ok);}
+  .status-pill.bought{border-color:var(--ok); color:var(--ok); text-decoration:line-through;}
+  .sl-item{display:flex; gap:8px; align-items:flex-start; padding:10px 0; border-bottom:1px solid var(--line); flex-wrap:wrap;}
+  .sl-item:last-child{border-bottom:none;}
+  .sl-item input[type=text], .sl-item input[type=number]{padding:6px 8px; font-size:13px;}
+  .sl-item.already_have .sl-name input, .sl-item.bought .sl-name input{opacity:0.5; text-decoration:line-through;}
+  .list-card{cursor:pointer;}
+  .list-card:hover{border-color:var(--saffron-dim);}
+
+  /* Meal plan grid */
+  .mp-day{border:1px solid var(--line); border-radius:var(--radius); background:var(--card); margin-bottom:12px; overflow:hidden;}
+  .mp-day.today{box-shadow:0 0 0 1px var(--saffron-dim) inset;}
+  .mp-day-head{padding:10px 14px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; font-family:'IBM Plex Mono',monospace; font-size:12px; text-transform:uppercase; letter-spacing:0.06em; color:var(--saffron);}
+  .mp-slot{display:flex; gap:10px; align-items:flex-start; padding:8px 14px; border-bottom:1px dashed var(--line); font-size:13.5px;}
+  .mp-slot:last-child{border-bottom:none;}
+  .mp-slot .slot-label{font-family:'IBM Plex Mono',monospace; font-size:11px; text-transform:uppercase; color:var(--text-dim); width:74px; flex-shrink:0; padding-top:3px;}
+  .mp-slot .slot-body{flex:1;}
+  .mp-meal{display:flex; justify-content:space-between; gap:8px; align-items:center; padding:3px 0;}
+  .mp-meal .mm-note{font-size:11.5px; color:var(--text-dim);}
+
+  /* Expiring soon */
+  .exp-group-label{font-family:'IBM Plex Mono',monospace; font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--warn); margin:12px 0 6px;}
+  .exp-group-label.later{color:var(--saffron);}
+  .exp-item{display:flex; justify-content:space-between; gap:8px; align-items:center; padding:6px 0; border-bottom:1px solid var(--line); font-size:13.5px; flex-wrap:wrap;}
+  .exp-item:last-child{border-bottom:none;}
+
+  /* Quick feedback tags */
+  .qf-chip{border:1px solid var(--line); background:var(--card-raised); color:var(--text-dim); padding:4px 10px; border-radius:999px; font-size:12px; cursor:pointer;}
+  .qf-chip:hover{border-color:var(--saffron-dim);}
+  .qf-chip.on{background:var(--saffron); border-color:var(--saffron); color:#1F2421; font-weight:600;}
+
+  #barcodeVideoWrap{position:relative; max-width:420px;}
+  #barcodeVideo{width:100%; border-radius:8px; border:1px solid var(--line);}
+  .source-note{font-size:11px; color:var(--text-dim); font-family:'IBM Plex Mono',monospace;}
 
   @media print{
     body *{visibility:hidden;}
@@ -174,10 +220,23 @@
     <button data-tab="recipes" class="active">New recipes</button>
     <button data-tab="favourites">Favourites</button>
     <button data-tab="koskas">Koskas</button>
+    <button data-tab="plan">Meal plan</button>
+    <button data-tab="shopping">Shopping</button>
     <button data-tab="profile">Profile &amp; shops</button>
   </nav>
 
   <div class="wrap">
+
+    <!-- Expiring soon: shown on app start, above whatever tab is active -->
+    <section class="panel hidden" id="expiringPanel">
+      <h2>Expiring soon</h2>
+      <div class="sub">In-app reminder based on the expiry dates in your Koskas. These appear when you open the app — this is not a background push notification.</div>
+      <div id="expiringBody"></div>
+      <div class="row" style="margin-top:14px;">
+        <button class="btn ghost small" id="enableRemindersBtn" type="button">Enable expiry reminders</button>
+        <span class="hint" id="remindersStatus" style="margin-top:0;"></span>
+      </div>
+    </section>
 
     <!-- TAB: RECIPES (wizard) -->
     <section id="tabRecipes">
@@ -234,6 +293,22 @@
       </section>
 
       <section class="panel">
+        <h2>Add by barcode</h2>
+        <div class="sub">Scan a packaged item's barcode (or type it in) and it looks the product up on Open Food Facts, a public product database. Name, size, ingredients, allergens and nutrition come from that database, not from AI guesses. You confirm before anything saves.</div>
+        <div class="row">
+          <button class="btn ghost small" id="barcodeScanBtn" type="button">Scan with camera</button>
+          <input type="text" id="barcodeManualInput" placeholder="or type barcode, e.g. 5390003014636" inputmode="numeric" style="flex:1; min-width:180px;">
+          <button class="btn ghost small" id="barcodeLookupBtn" type="button">Look up</button>
+        </div>
+        <div id="barcodeVideoWrap" class="hidden" style="margin-top:12px;">
+          <video id="barcodeVideo" autoplay muted playsinline></video>
+          <div class="row" style="margin-top:8px;"><button class="btn ghost small" id="barcodeStopBtn" type="button">Stop camera</button></div>
+        </div>
+        <div id="barcodeStatus" class="hint"></div>
+        <div id="barcodeResult" style="margin-top:14px;"></div>
+      </section>
+
+      <section class="panel">
         <h2>Add manually</h2>
         <div class="row">
           <input type="text" id="manItemName" placeholder="Item name" style="flex:2;">
@@ -249,18 +324,10 @@
       </section>
 
       <section class="panel" id="shoppingNeededPanel" style="display:none;">
-        <h2>Shopping list</h2>
-        <div class="sub">Running-low pantry items, plus anything you add below. This builds a list and hands you to each shop, it can't add items into a retailer's actual basket for you, no retailer offers that to outside apps.</div>
+        <h2>Running low</h2>
+        <div class="sub">Pantry items at or below their "keep at least" level. Send them to a shopping list under the Shopping tab, where you can edit the list, pick a shop and fulfilment, share it to WhatsApp or print it.</div>
         <div id="shoppingNeededList"></div>
-        <div class="row" style="margin-top:12px;">
-          <input type="text" id="extraShopItemInput" placeholder="Add something else to the list" style="flex:1;">
-          <button class="btn ghost small" id="extraShopItemAdd" type="button">Add</button>
-        </div>
-        <div class="row" style="margin-top:14px;">
-          <button class="btn ghost small" id="whatsappListBtn" type="button">Send to WhatsApp</button>
-          <button class="btn ghost small" id="printListBtn" type="button">Print list</button>
-        </div>
-        <div id="shopFulfilmentInfo" style="margin-top:16px;"></div>
+        <button class="btn ghost small" id="lowStockToListBtn" type="button" style="margin-top:12px;">Add these to a shopping list</button>
       </section>
 
       <section class="panel">
@@ -277,6 +344,83 @@
     <!-- TAB: FAVOURITES -->
     <section id="tabFavourites" class="hidden">
       <div id="favouritesBody"></div>
+    </section>
+
+    <!-- TAB: MEAL PLAN -->
+    <section id="tabPlan" class="hidden">
+      <section class="panel">
+        <div class="row" style="justify-content:space-between;">
+          <h2 id="mpWeekTitle">Meal plan</h2>
+          <div class="row">
+            <button class="btn ghost small" id="mpPrevWeek" type="button">← Prev</button>
+            <button class="btn ghost small" id="mpThisWeek" type="button">This week</button>
+            <button class="btn ghost small" id="mpNextWeek" type="button">Next →</button>
+          </div>
+        </div>
+        <div class="sub" style="margin-top:8px;">Monday to Sunday. Add favourites, freshly generated recipes, or manual meals. Tick meals and build a shopping list from the day, the week, or just the ticked ones.</div>
+        <div class="row" style="margin-bottom:16px;">
+          <button class="btn ghost small" id="mpListWeekBtn" type="button">Shopping list: whole week</button>
+          <button class="btn ghost small" id="mpListSelectedBtn" type="button">Shopping list: ticked meals</button>
+        </div>
+        <div id="mpGrid"></div>
+      </section>
+    </section>
+
+    <!-- TAB: SHOPPING / ORDER MODE -->
+    <section id="tabShopping" class="hidden">
+      <section class="panel" id="slOverviewPanel">
+        <h2>Shopping lists</h2>
+        <div class="sub">Saved for the whole household — they survive reloads and both of you see the same lists. Kook vir Jou builds and shares the list; it cannot add items to a retailer's basket or place an order for you, because no Irish grocery retailer offers a public API for that. The buttons below open the retailer's own site.</div>
+        <div class="row">
+          <input type="text" id="newListTitle" placeholder="New list name, e.g. Weekly shop" style="flex:1;">
+          <button class="btn small" id="newListBtn" type="button">Create list</button>
+        </div>
+        <div id="slListCards" style="margin-top:16px;"></div>
+      </section>
+
+      <section class="panel hidden" id="slDetailPanel">
+        <div class="row" style="justify-content:space-between;">
+          <h2 id="slDetailTitle">List</h2>
+          <button class="btn ghost small" id="slBackBtn" type="button">← All lists</button>
+        </div>
+        <div class="sub" id="slDetailSub"></div>
+
+        <label class="field-label">Fulfilment</label>
+        <div class="chip-grid" id="slFulfilChips">
+          <div class="chip" data-fm="delivery">Delivery</div>
+          <div class="chip" data-fm="click_collect">Click &amp; Collect</div>
+          <div class="chip" data-fm="in_store">In-store shopping</div>
+          <div class="chip" data-fm="whatsapp">WhatsApp list only</div>
+        </div>
+
+        <label class="field-label" for="slRetailerSelect">Retailer</label>
+        <select id="slRetailerSelect"></select>
+        <div id="slRetailerInfo" class="hint"></div>
+
+        <label class="field-label">Items</label>
+        <div class="hint" style="margin-bottom:8px;">Tap the status pill to cycle: required → optional → check pantry → already have → bought. Notes are for substitutions, e.g. "gluten-free pasta only".</div>
+        <div id="slItems"></div>
+        <div class="row" style="margin-top:12px;">
+          <input type="text" id="slExtraInput" placeholder="Add an item" style="flex:1;">
+          <button class="btn ghost small" id="slExtraAdd" type="button">Add</button>
+          <button class="btn ghost small" id="slAddLowStockBtn" type="button">Add low-stock items</button>
+        </div>
+
+        <label class="field-label">Share / export</label>
+        <div class="row">
+          <button class="btn ghost small" id="slWhatsAppBtn" type="button">Send to WhatsApp</button>
+          <button class="btn ghost small" id="slPrintBtn" type="button">Print</button>
+          <button class="btn ghost small" id="slCopyBtn" type="button">Copy to clipboard</button>
+          <button class="btn ghost small" id="slDownloadBtn" type="button">Download .txt</button>
+        </div>
+        <div class="row" style="margin-top:10px;" id="slRetailerLinkRow"></div>
+
+        <div class="row" style="margin-top:20px; border-top:1px solid var(--line); padding-top:16px;">
+          <button class="btn small" id="slCompleteBtn" type="button">Mark completed</button>
+          <button class="btn ghost small" id="slReopenBtn" type="button">Reopen</button>
+          <button class="btn ghost small" id="slDeleteBtn" type="button" style="color:var(--warn);">Delete list</button>
+        </div>
+      </section>
     </section>
 
     <!-- TAB: PROFILE & SHOPS -->
@@ -387,11 +531,52 @@
   </div>
 </div>
 
+<!-- STOCK DEDUCTION REVIEW MODAL -->
+<div id="deductModal" class="hidden">
+  <div class="modal-inner">
+    <h3 style="margin-bottom:6px;">Stock changes to apply</h3>
+    <div class="hint" style="margin-bottom:14px;">Only pantry items marked "track use in recipes" are considered. Untick anything you don't want deducted — nothing changes until you apply, and you can undo afterwards.</div>
+    <div id="deductRows"></div>
+    <div id="deductNoneMsg" class="hint hidden">No tracked pantry items match this recipe's ingredients, so there's nothing to deduct.</div>
+    <div class="row" style="margin-top:16px;">
+      <button class="btn" id="deductApplyBtn" type="button">Apply changes</button>
+      <button class="btn ghost" id="deductCancelBtn" type="button">Skip</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD MEAL MODAL -->
+<div id="mealModal" class="hidden">
+  <div class="modal-inner">
+    <h3 style="margin-bottom:6px;" id="mealModalTitle">Add meal</h3>
+    <div class="hint" id="mealModalSub" style="margin-bottom:14px;"></div>
+    <label class="field-label" for="mealRecipeSelect">Recipe</label>
+    <select id="mealRecipeSelect"></select>
+    <label class="field-label" for="mealManualInput">Or a manual meal</label>
+    <input type="text" id="mealManualInput" placeholder="e.g. Toasties and soup">
+    <label class="field-label" for="mealLeftoverSelect">Or use logged leftovers</label>
+    <select id="mealLeftoverSelect"></select>
+    <label class="field-label" for="mealServings">Servings</label>
+    <input type="number" id="mealServings" min="1" max="12" value="2" style="width:90px;">
+    <label style="font-size:12.5px; display:flex; align-items:center; gap:6px; margin-top:14px;">
+      <input type="checkbox" id="mealCookTwice"> Cook once, eat twice (adds a leftovers meal the next day, same slot)
+    </label>
+    <label class="field-label" for="mealNotes">Notes</label>
+    <input type="text" id="mealNotes" placeholder="optional">
+    <div class="row" style="margin-top:16px;">
+      <button class="btn" id="mealSaveBtn" type="button">Add to plan</button>
+      <button class="btn ghost" id="mealCancelBtn" type="button">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- RATING MODAL -->
 <div id="ratingModal" class="hidden">
   <div class="modal-inner">
     <h3 style="margin-bottom:16px;">Rate this recipe</h3>
     <div id="starRows"></div>
+    <label class="field-label">Quick tags</label>
+    <div class="chip-grid" id="ratingQuickTags" style="margin-bottom:4px;"></div>
     <label class="field-label" for="ratingComment">Comment</label>
     <textarea id="ratingComment" placeholder="e.g. next time double the chorizo"></textarea>
     <div class="row" style="margin-top:16px;">
@@ -404,7 +589,7 @@
 <div id="printArea" class="hidden"></div>
 
 <footer class="note">
-  Cost totals, calorie and protein figures (marked *) mix your saved data with typical-value estimates from the recipe generator, estimated figures are flagged as such, not measured. Photo-scanned pantry items are the AI's best guess at what's in the picture, confirm or correct each line before it saves, nothing saves automatically. Nothing in this app can place an order on a retailer's site for you, it can only help you build the list and jump to their search.
+  Cost, calorie and protein figures marked * are AI estimates, not measured values; figures from your saved prices or from Open Food Facts are labelled with their source. The allergy warnings in this app are a best-effort keyword check, not a certified allergen check — it can miss hidden ingredients and flag harmless ones. Always check the actual product label, especially for Coeliac / gluten-free requirements. Photo-scanned pantry items are the AI's best guess at what's in the picture; nothing saves without your confirmation. Nothing in this app can place an order or add items to a retailer's basket for you — it builds the list and opens the retailer's own site.
 </footer>
 
 <script type="module">
@@ -438,6 +623,9 @@ function el(tag, attrs, children){
 
 let session = null, profile = null, household = null, shops = [], ingredientPrices = {}, pantryItems = [], leftovers = [];
 let lastDeduction = [];
+let shoppingLists = [], currentList = null, currentListItems = [];
+let mpWeekStart = null, mpPlan = null, mpItems = [], mpSelected = new Set();
+let recipeTagsCache = {}; // recipe_id -> Set of this user's tags
 const state = {
   cuisines: new Set(), cuisineFree:"", onHand:[], recipeCount:3, servings:2, units:"metric",
   currentResults: null
@@ -484,6 +672,8 @@ async function showApp(){
     renderProfileTab();
     renderHouseholdTab();
     renderShopChips();
+    updateRemindersStatus();
+    maybeShowExpiryNotification();
   } catch(err){
     console.error('Startup failed:', err);
     document.getElementById('appShell').innerHTML = `<div class="wrap"><div class="panel"><div class="error-box">Setup isn't finished yet: ${err.message}</div><button class="btn ghost small" onclick="location.reload()" type="button">Retry</button></div></div>`;
@@ -606,10 +796,15 @@ document.getElementById('saveDietBtn').addEventListener('click', async () => {
 
 document.querySelectorAll('#unitsToggle .chip').forEach(chip => {
   chip.addEventListener('click', async () => {
+    const previous = state.units;
     document.querySelectorAll('#unitsToggle .chip').forEach(c => c.classList.remove('selected'));
     chip.classList.add('selected');
     state.units = chip.dataset.unit;
-    await supabase.from('profiles').update({ units_preference: state.units }).eq('id', session.user.id);
+    const { error } = await safeDb(supabase.from('profiles').update({ units_preference: state.units }).eq('id', session.user.id), 'Could not save units preference');
+    if(error){
+      state.units = previous;
+      document.querySelectorAll('#unitsToggle .chip').forEach(c => c.classList.toggle('selected', c.dataset.unit === previous));
+    }
   });
 });
 
@@ -636,25 +831,30 @@ document.getElementById('saveAddrBtn').addEventListener('click', async () => {
   } else if(!household.maps_api_key){
     status.textContent = 'Address saved. Add a Google Maps key below to enable distance-based shop search.';
   }
-  await supabase.from('households').update({ delivery_address: address, delivery_eircode: eircode, delivery_lat: lat, delivery_lon: lon }).eq('id', household.id);
+  const { error } = await safeDb(supabase.from('households').update({ delivery_address: address, delivery_eircode: eircode, delivery_lat: lat, delivery_lon: lon }).eq('id', household.id), 'Could not save the address');
+  if(error){ status.textContent = 'The address did not save — try again.'; return; }
+  household.delivery_address = address; household.delivery_eircode = eircode;
   household.delivery_lat = lat; household.delivery_lon = lon;
+  if(status.textContent === 'Saving…') status.textContent = 'Address saved.';
 });
 
 document.getElementById('saveMapsKeyBtn').addEventListener('click', async () => {
   const key = document.getElementById('mapsKeyInput').value.trim();
-  await supabase.from('households').update({ maps_api_key: key }).eq('id', household.id);
+  const { error } = await safeDb(supabase.from('households').update({ maps_api_key: key }).eq('id', household.id), 'Could not save the Maps key');
+  if(error) return;
   household.maps_api_key = key;
   document.getElementById('mapsStatus').textContent = 'Key saved.';
 });
 
 // ---------------- SHOPS ----------------
 async function loadShops(){
-  const { data } = await supabase.from('shops').select('*').eq('household_id', household.id).order('pinned', {ascending:false}).order('name');
+  const { data, error } = await safeDb(supabase.from('shops').select('*').eq('household_id', household.id).order('pinned', {ascending:false}).order('name'), 'Could not load your shops');
+  if(error){ shops = shops || []; return; }
   if(data && data.length){ shops = data; }
   else {
     // seed defaults for a brand-new household
     const seed = DEFAULT_SHOPS.map(name => ({ household_id: household.id, name, source:'manual', selected:true }));
-    const { data: inserted } = await supabase.from('shops').insert(seed).select();
+    const { data: inserted } = await safeDb(supabase.from('shops').insert(seed).select(), 'Could not set up your default shops');
     shops = inserted || [];
   }
 }
@@ -664,15 +864,31 @@ function renderShopChips(){
   shops.forEach(shop => {
     const chip = el('div', {class:'shop-chip' + (shop.selected ? ' selected':'') + (shop.pinned ? ' pinned':'')});
     const label = el('span', {text: shop.name});
-    label.addEventListener('click', async () => { shop.selected = !shop.selected; await supabase.from('shops').update({selected:shop.selected}).eq('id', shop.id); renderShopChips(); });
+    label.addEventListener('click', async () => {
+      shop.selected = !shop.selected;
+      const { error } = await safeDb(supabase.from('shops').update({selected:shop.selected}).eq('id', shop.id), 'Could not update the shop');
+      if(error) shop.selected = !shop.selected;
+      renderShopChips();
+    });
     chip.appendChild(label);
     if(shop.distance_km) chip.appendChild(el('span', {class:'shop-meta', text: shop.distance_km.toFixed(1)+'km'}));
     const pinBtn = el('button', {class:'icon-btn', type:'button', title:'Pin'});
     pinBtn.textContent = shop.pinned ? '📌' : '📍';
-    pinBtn.addEventListener('click', async (e) => { e.stopPropagation(); shop.pinned = !shop.pinned; await supabase.from('shops').update({pinned:shop.pinned}).eq('id', shop.id); renderShopChips(); });
+    pinBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      shop.pinned = !shop.pinned;
+      const { error } = await safeDb(supabase.from('shops').update({pinned:shop.pinned}).eq('id', shop.id), 'Could not pin the shop');
+      if(error) shop.pinned = !shop.pinned;
+      renderShopChips();
+    });
     chip.appendChild(pinBtn);
     const rmBtn = el('button', {class:'icon-btn', type:'button', title:'Remove'}); rmBtn.textContent = '✕';
-    rmBtn.addEventListener('click', async (e) => { e.stopPropagation(); await supabase.from('shops').delete().eq('id', shop.id); shops = shops.filter(s => s.id !== shop.id); renderShopChips(); });
+    rmBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const { error } = await safeDb(supabase.from('shops').delete().eq('id', shop.id), 'Could not remove the shop');
+      if(error) return;
+      shops = shops.filter(s => s.id !== shop.id); renderShopChips();
+    });
     chip.appendChild(rmBtn);
     wrap.appendChild(chip);
   });
@@ -682,7 +898,8 @@ document.getElementById('shopManualAdd').addEventListener('click', async () => {
   const input = document.getElementById('shopManualInput');
   const name = input.value.trim();
   if(!name) return;
-  const { data } = await supabase.from('shops').insert({ household_id: household.id, name, source:'manual', selected:true }).select().single();
+  const { data, error } = await safeDb(supabase.from('shops').insert({ household_id: household.id, name, source:'manual', selected:true }).select().single(), 'Could not add the shop');
+  if(error) return;
   if(data){ shops.push(data); renderShopChips(); }
   input.value = '';
 });
@@ -716,10 +933,10 @@ document.getElementById('findShopsBtn').addEventListener('click', async () => {
       const distance_km = haversineKm(household.delivery_lat, household.delivery_lon, dLat, dLon);
       const existing = shops.find(s => s.name.toLowerCase() === name.toLowerCase());
       if(existing){
-        await supabase.from('shops').update({ distance_km }).eq('id', existing.id);
-        existing.distance_km = distance_km;
+        const { error } = await safeDb(supabase.from('shops').update({ distance_km }).eq('id', existing.id), 'Could not update shop distance');
+        if(!error) existing.distance_km = distance_km;
       } else {
-        const { data: inserted } = await supabase.from('shops').insert({ household_id: household.id, name, source:'detected', selected:true, distance_km }).select().single();
+        const { data: inserted } = await safeDb(supabase.from('shops').insert({ household_id: household.id, name, source:'detected', selected:true, distance_km }).select().single(), 'Could not save a found shop');
         if(inserted){ shops.push(inserted); added++; }
       }
     }
@@ -738,16 +955,19 @@ function haversineKm(lat1, lon1, lat2, lon2){
 
 // ---------------- INGREDIENT PRICES ----------------
 async function loadIngredientPrices(){
-  const { data } = await supabase.from('ingredient_prices').select('*').eq('household_id', household.id);
+  const { data } = await safeDb(supabase.from('ingredient_prices').select('*').eq('household_id', household.id), 'Could not load your saved prices');
   ingredientPrices = {};
   (data||[]).forEach(row => { ingredientPrices[row.ingredient_name.toLowerCase()] = row; });
 }
 async function saveIngredientPrice(name, unit, price){
   const key = name.toLowerCase();
-  const { data } = await supabase.from('ingredient_prices')
+  const { data, error } = await safeDb(supabase.from('ingredient_prices')
     .upsert({ household_id: household.id, ingredient_name: name, unit, price }, { onConflict:'household_id,ingredient_name,unit' })
-    .select().single();
+    .select().single(), 'Could not save the price');
+  if(error) return false;
   if(data) ingredientPrices[key] = data;
+  showToast('Price saved');
+  return true;
 }
 
 // ---------------- TABS ----------------
@@ -755,9 +975,11 @@ document.querySelectorAll('.tabs button').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    ['recipes','favourites','koskas','profile'].forEach(t => document.getElementById('tab'+t[0].toUpperCase()+t.slice(1)).classList.toggle('hidden', t !== btn.dataset.tab));
+    ['recipes','favourites','koskas','plan','shopping','profile'].forEach(t => document.getElementById('tab'+t[0].toUpperCase()+t.slice(1)).classList.toggle('hidden', t !== btn.dataset.tab));
     if(btn.dataset.tab === 'favourites') loadFavourites();
     if(btn.dataset.tab === 'koskas'){ loadPantry(); loadLeftovers(); }
+    if(btn.dataset.tab === 'plan') loadMealPlan();
+    if(btn.dataset.tab === 'shopping') loadShoppingLists();
   });
 });
 
@@ -827,6 +1049,20 @@ function scanForAllergens(recipe, allergyList){
   return hits;
 }
 
+// One shared pattern for every Supabase read/write that matters: awaits the query,
+// surfaces failures to the user (toast) and to the console, returns { data, error }.
+// Call sites should bail out (and revert any optimistic UI change) when error is set.
+async function safeDb(query, friendlyMessage){
+  let res;
+  try { res = await query; }
+  catch(e){ res = { data: null, error: e }; }
+  if(res.error){
+    console.error(friendlyMessage, res.error);
+    showToast(friendlyMessage + (res.error.message ? ': ' + res.error.message : ''), true);
+  }
+  return res;
+}
+
 function showToast(msg, isError){
   let t = document.getElementById('appToast');
   if(!t){
@@ -845,15 +1081,38 @@ async function buildPreferenceSummary(){
   const { data } = await supabase.from('recipe_ratings')
     .select('taste,convenience,cost,serving_size,comment,recipes(title,cuisine,ingredients)')
     .order('created_at', {ascending:false}).limit(20);
-  if(!data || !data.length) return 'No rating history yet.';
-  const liked = data.filter(r => (r.taste||0) >= 4).map(r => r.recipes?.title).filter(Boolean);
-  const disliked = data.filter(r => (r.taste||0) <= 2).map(r => r.recipes?.title).filter(Boolean);
-  const comments = data.filter(r => r.comment).map(r => `"${r.comment}" (on ${r.recipes?.title || 'a past recipe'})`);
   let summary = '';
-  if(liked.length) summary += `This household rated highly in the past: ${liked.join(', ')}. `;
-  if(disliked.length) summary += `Rated poorly, avoid similar: ${disliked.join(', ')}. `;
-  if(comments.length) summary += `Specific feedback from either person to apply: ${comments.join('; ')}.`;
-  return summary || 'No strong signal yet.';
+  if(data && data.length){
+    const liked = data.filter(r => (r.taste||0) >= 4).map(r => r.recipes?.title).filter(Boolean);
+    const disliked = data.filter(r => (r.taste||0) <= 2).map(r => r.recipes?.title).filter(Boolean);
+    const comments = data.filter(r => r.comment).map(r => `"${r.comment}" (on ${r.recipes?.title || 'a past recipe'})`);
+    if(liked.length) summary += `This household rated highly in the past: ${liked.join(', ')}. `;
+    if(disliked.length) summary += `Rated poorly, avoid similar: ${disliked.join(', ')}. `;
+    if(comments.length) summary += `Specific feedback from either person to apply: ${comments.join('; ')}. `;
+  }
+  summary += await buildTagSummary();
+  return summary.trim() || 'No rating history yet.';
+}
+
+// Aggregates quick-feedback tags (from both household members) into guidance for the prompt.
+async function buildTagSummary(){
+  const { data, error } = await safeDb(supabase.from('recipe_feedback_tags')
+    .select('tag, recipes(title)')
+    .order('created_at', {ascending:false}).limit(120), 'Could not load feedback tags');
+  if(error || !data || !data.length) return '';
+  const byTag = {};
+  data.forEach(t => {
+    if(!byTag[t.tag]) byTag[t.tag] = new Set();
+    if(t.recipes?.title) byTag[t.tag].add(t.recipes.title);
+  });
+  const lines = Object.entries(byTag).map(([tag, titles]) => `"${tag}": ${[...titles].slice(0,6).join(', ')}`);
+  let s = `Quick feedback tags this household applied to past recipes — ${lines.join(' | ')}. `;
+  s += 'Steer by these tags: repeat the style of anything tagged "make again" or "great taste"; never suggest anything similar to recipes tagged "avoid next time"; ';
+  if(byTag['too much effort']) s += 'keep effort and washing-up low (past complaints: "too much effort"/"too many dishes"); ';
+  if(byTag['too expensive']) s += 'watch cost, especially if budget-friendly was requested (past complaints: "too expensive"); ';
+  if(byTag['high protein win']) s += 'high-protein meals land well here; ';
+  if(byTag['too bland']) s += 'season boldly, "too bland" has come up; ';
+  return s;
 }
 
 // ---------------- GENERATE ----------------
@@ -979,13 +1238,19 @@ async function persistRecipes(parsed){
 }
 
 function computeCost(ingredients){
-  let total = 0, anyEstimated = false;
+  let total = 0, savedCount = 0, estimatedCount = 0;
   ingredients.forEach(ing => {
     const stored = ingredientPrices[(ing.item||'').toLowerCase()];
-    if(stored){ total += Number(stored.price); }
-    else { total += Number(ing.estimatedPriceEur)||0; anyEstimated = true; }
+    if(stored){ total += Number(stored.price); savedCount++; }
+    else { total += Number(ing.estimatedPriceEur)||0; estimatedCount++; }
   });
-  return { total, anyEstimated };
+  return { total, anyEstimated: estimatedCount > 0, savedCount, estimatedCount };
+}
+function costSourceNote(c){
+  const parts = [];
+  if(c.savedCount) parts.push(c.savedCount + ' from your saved prices');
+  if(c.estimatedCount) parts.push(c.estimatedCount + ' AI estimates*');
+  return parts.length ? parts.join(' · ') : 'no priced ingredients';
 }
 
 function renderResults(recipes, onHandAlternative){
@@ -1004,7 +1269,7 @@ function buildRecipeCard(r, onHandLower, isAlt){
   const allergyHits = household && household.allergies ? scanForAllergens(r, household.allergies) : [];
   if(allergyHits.length){
     const warnBox = el('div', {class:'error-box', style:'margin-bottom:10px;'});
-    warnBox.textContent = 'Possible match for ' + allergyHits.map(h => h.allergen + ' (' + h.matched.join(', ') + ')').join('; ') + ' in the ingredients below, this is a keyword check, not certain, check before eating.';
+    warnBox.textContent = 'Keyword allergy check: possible match for ' + allergyHits.map(h => h.allergen + ' (' + h.matched.join(', ') + ')').join('; ') + ' in the ingredients below. This is not a certified allergen check — it can miss hidden ingredients and flag harmless ones. Always check product labels, especially for Coeliac / gluten-free requirements.';
     top.appendChild(warnBox);
   }
   top.appendChild(el('h3', {text: (isAlt ? '↺ ' : '') + (r.title||'Untitled')}));
@@ -1032,28 +1297,32 @@ function buildRecipeCard(r, onHandLower, isAlt){
     rateBtn.addEventListener('click', () => openRatingModal(r));
     actions.appendChild(rateBtn);
     const cookedBtn = el('button', {class:'btn ghost small', type:'button', text:'Mark as cooked'});
-    cookedBtn.addEventListener('click', async () => {
-      cookedBtn.disabled = true; cookedBtn.textContent = 'Updating stock…';
-      lastDeduction = [];
-      const notTracked = await deductPantryForRecipe(r);
-      cookedBtn.textContent = 'Marked as cooked';
-      if(lastDeduction.length){
-        const undoBtn = el('button', {class:'btn ghost small', type:'button', text:'Undo stock update'});
-        undoBtn.addEventListener('click', async () => {
-          for(const d of lastDeduction){
-            await supabase.from('pantry_items').update({ quantity: d.previousQuantity }).eq('id', d.id);
-            const item = pantryItems.find(p => p.id === d.id);
-            if(item) item.quantity = d.previousQuantity;
-          }
-          renderPantryList(); renderShoppingNeeded();
-          undoBtn.remove();
-        });
-        actions.appendChild(undoBtn);
-      }
-      openLeftoverModal(r);
-      if(notTracked.length) console.log('Not auto-tracked (no tracked pantry match or unit mismatch):', notTracked);
+    cookedBtn.addEventListener('click', () => {
+      // Review step: nothing is deducted until the user confirms in the modal.
+      openDeductModal(r, (applied) => {
+        cookedBtn.textContent = 'Marked as cooked';
+        if(applied.length){
+          const undoBtn = el('button', {class:'btn ghost small', type:'button', text:'Undo stock update'});
+          undoBtn.addEventListener('click', async () => {
+            let failed = false;
+            for(const d of applied){
+              const { error } = await safeDb(supabase.from('pantry_items').update({ quantity: d.previousQuantity }).eq('id', d.id), 'Could not undo a stock change');
+              if(error){ failed = true; continue; }
+              const item = pantryItems.find(p => p.id === d.id);
+              if(item) item.quantity = d.previousQuantity;
+            }
+            renderPantryList(); renderShoppingNeeded(); renderExpiringPanel();
+            if(!failed){ showToast('Stock changes undone'); undoBtn.remove(); }
+          });
+          actions.appendChild(undoBtn);
+        }
+        openLeftoverModal(r);
+      });
     });
     actions.appendChild(cookedBtn);
+    const shopListBtn = el('button', {class:'btn ghost small', type:'button', text:'Add to shopping list'});
+    shopListBtn.addEventListener('click', () => addRecipeToShoppingList(r));
+    actions.appendChild(shopListBtn);
   }
   const printBtn = el('button', {class:'btn ghost small', type:'button', text:'Print'});
   printBtn.addEventListener('click', () => printRecipe(r));
@@ -1062,6 +1331,7 @@ function buildRecipeCard(r, onHandLower, isAlt){
   cookBtn.addEventListener('click', () => startCooking(r));
   actions.appendChild(cookBtn);
   top.appendChild(actions);
+  if(r.id) top.appendChild(buildQuickTagRow(r));
   card.appendChild(top);
 
   const bodyGrid = el('div', {class:'rc-body'});
@@ -1071,8 +1341,12 @@ function buildRecipeCard(r, onHandLower, isAlt){
     const isOnHand = onHandLower.some(o => (ing.item||'').toLowerCase().includes(o));
     const li = el('li', isOnHand ? {class:'have'} : {});
     li.appendChild(el('span', {class:'item', text:ing.item||''}));
-    li.appendChild(el('span', {class:'amt', text:[ing.amount, ing.unit].filter(Boolean).join(' ')}));
+    const right = el('span', {class:'amt', text:[ing.amount, ing.unit].filter(Boolean).join(' ')});
+    const stored = ingredientPrices[(ing.item||'').toLowerCase()];
+    if(stored) right.title = '€' + Number(stored.price).toFixed(2) + ' — your saved household price';
+    else if(ing.estimatedPriceEur != null) right.title = '€' + Number(ing.estimatedPriceEur).toFixed(2) + ' — AI estimate, not a real price';
     ingList.appendChild(li);
+    li.appendChild(right);
   });
   ingCol.appendChild(ingList);
   bodyGrid.appendChild(ingCol);
@@ -1089,10 +1363,10 @@ function buildRecipeCard(r, onHandLower, isAlt){
     bodyGrid.appendChild(note);
   }
 
-  const { total, anyEstimated } = computeCost(r.ingredients||[]);
+  const cost = computeCost(r.ingredients||[]);
   const costRow = el('div', {class:'rc-cost'});
-  costRow.appendChild(el('div', {class:'total', text:'Total: €' + total.toFixed(2)}));
-  costRow.appendChild(el('div', {class:'note', text: anyEstimated ? 'includes estimated prices, edit below to refine' : 'from your saved prices'}));
+  costRow.appendChild(el('div', {class:'total', text:'Total: €' + cost.total.toFixed(2) + (cost.anyEstimated ? '*' : '')}));
+  costRow.appendChild(el('div', {class:'note', text: costSourceNote(cost)}));
   bodyGrid.appendChild(costRow);
 
   const priceEditWrap = el('div', {class:'rc-note', style:'grid-column:1/-1;'});
@@ -1104,10 +1378,11 @@ function buildRecipeCard(r, onHandLower, isAlt){
   const priceSaveBtn = el('button', {class:'btn ghost small', type:'button', text:'Save price'});
   priceSaveBtn.addEventListener('click', async () => {
     const val = parseFloat(priceInput.value); if(isNaN(val)) return;
-    await saveIngredientPrice(priceSelect.value, null, val);
-    const { total:t2, anyEstimated:e2 } = computeCost(r.ingredients||[]);
-    costRow.firstChild.textContent = 'Total: €' + t2.toFixed(2);
-    costRow.lastChild.textContent = e2 ? 'includes estimated prices, edit below to refine' : 'from your saved prices';
+    const ok = await saveIngredientPrice(priceSelect.value, null, val);
+    if(!ok) return;
+    const c2 = computeCost(r.ingredients||[]);
+    costRow.firstChild.textContent = 'Total: €' + c2.total.toFixed(2) + (c2.anyEstimated ? '*' : '');
+    costRow.lastChild.textContent = costSourceNote(c2);
   });
   priceRow.appendChild(priceSelect); priceRow.appendChild(priceInput); priceRow.appendChild(priceSaveBtn);
   priceEditWrap.appendChild(priceRow);
@@ -1132,10 +1407,11 @@ function buildRecipeCard(r, onHandLower, isAlt){
 
 // ---------------- KOSKAS: PANTRY / STOCK REGISTER ----------------
 async function loadPantry(){
-  const { data } = await supabase.from('pantry_items').select('*').eq('household_id', household.id).order('expiry_date', {ascending:true, nullsFirst:false});
-  pantryItems = data || [];
+  const { data, error } = await safeDb(supabase.from('pantry_items').select('*').eq('household_id', household.id).order('expiry_date', {ascending:true, nullsFirst:false}), 'Could not load your pantry');
+  if(!error) pantryItems = data || [];
   renderPantryList();
   renderShoppingNeeded();
+  renderExpiringPanel();
 }
 
 function daysUntil(dateStr){
@@ -1160,29 +1436,53 @@ function renderPantryList(){
     }
     const nameColor = dLeft !== null && dLeft < 0 ? 'var(--warn)' : (dLeft !== null && dLeft <= 3 ? 'var(--saffron)' : 'var(--text)');
     left.appendChild(el('div', {style:`font-weight:600; color:${nameColor};`, text: item.name + badge}));
-    const meta = [item.quantity + ' ' + (item.unit||''), item.par_level ? ('keep ≥ ' + item.par_level + ' ' + (item.unit||'')) : null, item.track_consumption ? 'tracked in recipes' : null].filter(Boolean).join(' · ');
+    const meta = [item.quantity + ' ' + (item.unit||''), item.brand || null, item.par_level ? ('keep ≥ ' + item.par_level + ' ' + (item.unit||'')) : null, item.track_consumption ? 'tracked in recipes' : null].filter(Boolean).join(' · ');
     left.appendChild(el('div', {class:'hint', text: meta}));
+    const n = item.nutrition_per_100g;
+    if(n && (n['energy-kcal_100g'] != null || n.proteins_100g != null)){
+      const bits = [];
+      if(n['energy-kcal_100g'] != null) bits.push(Math.round(n['energy-kcal_100g']) + ' kcal');
+      if(n.proteins_100g != null) bits.push(n.proteins_100g + 'g protein');
+      left.appendChild(el('div', {class:'source-note', text:'Open Food Facts, per 100g: ' + bits.join(' · ')}));
+    }
+    if(item.allergen_text){
+      left.appendChild(el('div', {class:'source-note', style:'color:var(--warn);', text:'Allergens on record (Open Food Facts): ' + item.allergen_text}));
+    }
     if(item.par_level != null && item.quantity <= item.par_level){
       left.appendChild(el('div', {style:'color:var(--warn); font-size:12px; margin-top:2px;', text:'Low stock'}));
     }
     top.appendChild(left);
     const controls = el('div', {class:'row'});
+    const setQty = async (newQty) => {
+      const previous = item.quantity;
+      item.quantity = newQty;
+      const { error } = await safeDb(supabase.from('pantry_items').update({quantity:item.quantity, updated_at: new Date().toISOString()}).eq('id', item.id), 'Could not update the quantity');
+      if(error) item.quantity = previous;
+      renderPantryList(); renderShoppingNeeded(); renderExpiringPanel();
+    };
     const minus = el('button', {class:'btn ghost small', type:'button', text:'−'});
-    minus.addEventListener('click', async () => { item.quantity = Math.max(0, item.quantity - 1); await supabase.from('pantry_items').update({quantity:item.quantity}).eq('id', item.id); renderPantryList(); renderShoppingNeeded(); });
+    minus.addEventListener('click', () => setQty(Math.max(0, item.quantity - 1)));
     const plus = el('button', {class:'btn ghost small', type:'button', text:'+'});
-    plus.addEventListener('click', async () => { item.quantity = item.quantity + 1; await supabase.from('pantry_items').update({quantity:item.quantity}).eq('id', item.id); renderPantryList(); renderShoppingNeeded(); });
+    plus.addEventListener('click', () => setQty(item.quantity + 1));
     const trackBtn = el('button', {class:'btn ghost small', type:'button', text: item.track_consumption ? '★ tracked' : '☆ track'});
-    trackBtn.addEventListener('click', async () => { item.track_consumption = !item.track_consumption; await supabase.from('pantry_items').update({track_consumption:item.track_consumption}).eq('id', item.id); renderPantryList(); });
+    trackBtn.addEventListener('click', async () => {
+      item.track_consumption = !item.track_consumption;
+      const { error } = await safeDb(supabase.from('pantry_items').update({track_consumption:item.track_consumption}).eq('id', item.id), 'Could not update tracking');
+      if(error) item.track_consumption = !item.track_consumption;
+      renderPantryList();
+    });
     const delBtn = el('button', {class:'btn ghost small', type:'button', text:'✕'});
-    delBtn.addEventListener('click', async () => { await supabase.from('pantry_items').delete().eq('id', item.id); pantryItems = pantryItems.filter(p=>p.id!==item.id); renderPantryList(); renderShoppingNeeded(); });
+    delBtn.addEventListener('click', async () => {
+      const { error } = await safeDb(supabase.from('pantry_items').delete().eq('id', item.id), 'Could not delete the item');
+      if(error) return;
+      pantryItems = pantryItems.filter(p=>p.id!==item.id); renderPantryList(); renderShoppingNeeded(); renderExpiringPanel();
+    });
     controls.appendChild(minus); controls.appendChild(plus); controls.appendChild(trackBtn); controls.appendChild(delBtn);
     top.appendChild(controls);
     row.appendChild(top);
     wrap.appendChild(row);
   });
 }
-
-let extraShopItems = [];
 
 const SHOP_FULFILMENT = {
   // Verified directly against each retailer's own site, July 2026. Re-check periodically, this can change.
@@ -1196,11 +1496,15 @@ const SHOP_FULFILMENT = {
   "M&S Food": { delivery: null, collect: null, note: "Not verified recently, check marksandspencer.ie.", url: "https://www.marksandspencer.ie/" }
 };
 
+function lowStockItems(){
+  return pantryItems.filter(i => i.par_level != null && i.quantity <= i.par_level);
+}
+
 function renderShoppingNeeded(){
   const panel = document.getElementById('shoppingNeededPanel');
   const list = document.getElementById('shoppingNeededList');
-  const low = pantryItems.filter(i => i.par_level != null && i.quantity <= i.par_level);
-  if(!low.length && !extraShopItems.length){ panel.style.display = 'none'; return; }
+  const low = lowStockItems();
+  if(!low.length){ panel.style.display = 'none'; return; }
   panel.style.display = 'block';
   list.innerHTML = '';
   const ul = el('ul', {class:'ing-list'});
@@ -1210,62 +1514,20 @@ function renderShoppingNeeded(){
     li.appendChild(el('span', {class:'amt', text: `have ${i.quantity}${i.unit?(' '+i.unit):''}, keep ≥ ${i.par_level}`}));
     ul.appendChild(li);
   });
-  extraShopItems.forEach((name, idx) => {
-    const li = el('li');
-    li.appendChild(el('span', {text: name}));
-    const rm = el('button', {class:'icon-btn', type:'button', text:'✕'});
-    rm.addEventListener('click', () => { extraShopItems.splice(idx,1); renderShoppingNeeded(); });
-    li.appendChild(rm);
-    ul.appendChild(li);
-  });
   list.appendChild(ul);
-
-  const fulfilWrap = document.getElementById('shopFulfilmentInfo');
-  fulfilWrap.innerHTML = '';
-  shops.filter(s=>s.selected).forEach(s => {
-    const info = SHOP_FULFILMENT[s.name];
-    const url = info?.url || SHOP_HOMEPAGES[s.name];
-    const card = el('div', {class:'panel', style:'padding:12px 14px; margin-bottom:8px;'});
-    card.appendChild(el('div', {style:'font-weight:600;', text:s.name}));
-    if(info) card.appendChild(el('div', {class:'hint', text:info.note}));
-    if(url) card.appendChild(el('a', {href:url, target:'_blank', rel:'noopener', text:'Start shopping on '+s.name, class:'btn ghost small', style:'text-decoration:none; margin-top:8px; display:inline-block;'}));
-    fulfilWrap.appendChild(card);
-  });
 }
 
-document.getElementById('extraShopItemAdd').addEventListener('click', () => {
-  const input = document.getElementById('extraShopItemInput');
-  const val = input.value.trim();
-  if(!val) return;
-  extraShopItems.push(val);
-  input.value = '';
-  renderShoppingNeeded();
-});
-document.getElementById('extraShopItemInput').addEventListener('keydown', e => {
-  if(e.key === 'Enter'){ e.preventDefault(); document.getElementById('extraShopItemAdd').click(); }
-});
-
-function buildShoppingListText(){
-  const low = pantryItems.filter(i => i.par_level != null && i.quantity <= i.par_level).map(i => `- ${i.name} (have ${i.quantity}${i.unit?(' '+i.unit):''}, keep ≥ ${i.par_level})`);
-  const extra = extraShopItems.map(i => `- ${i}`);
-  return ['Shopping list from Kook vir Jou:', ...low, ...extra].join('\n');
-}
-
-document.getElementById('whatsappListBtn').addEventListener('click', () => {
-  const text = buildShoppingListText();
-  window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
-});
-
-document.getElementById('printListBtn').addEventListener('click', () => {
-  const area = document.getElementById('printArea');
-  area.innerHTML = '';
-  area.appendChild(el('h1', {text:'Shopping list'}));
-  const ul = el('ul');
-  buildShoppingListText().split('\n').slice(1).forEach(line => ul.appendChild(el('li', {text: line.replace(/^- /, '')})));
-  area.appendChild(ul);
-  area.classList.remove('hidden');
-  window.print();
-  area.classList.add('hidden');
+document.getElementById('lowStockToListBtn').addEventListener('click', async () => {
+  const low = lowStockItems();
+  if(!low.length) return;
+  const list = await ensureDraftList('Restock list', 'low_stock');
+  if(!list) return;
+  const added = await addItemsToList(list, low.map(i => ({
+    item_name: i.name,
+    quantity_text: `have ${i.quantity}${i.unit?(' '+i.unit):''}, keep ≥ ${i.par_level}`,
+    pantry_item_id: i.id, source:'low_stock'
+  })));
+  if(added) openShoppingTab(list.id);
 });
 
 document.getElementById('manItemAdd').addEventListener('click', async () => {
@@ -1278,8 +1540,9 @@ document.getElementById('manItemAdd').addEventListener('click', async () => {
   const expiryRaw = document.getElementById('manItemExpiry').value.trim();
   const expiry_date = expiryRaw || null;
   const track_consumption = document.getElementById('manItemTrack').checked;
-  const { data } = await supabase.from('pantry_items').insert({ household_id: household.id, name, quantity, unit, par_level, expiry_date, track_consumption, source:'manual' }).select().single();
-  if(data){ pantryItems.push(data); renderPantryList(); renderShoppingNeeded(); }
+  const { data, error } = await safeDb(supabase.from('pantry_items').insert({ household_id: household.id, name, quantity, unit, par_level, expiry_date, track_consumption, source:'manual' }).select().single(), 'Could not add the item');
+  if(error) return;
+  if(data){ pantryItems.push(data); renderPantryList(); renderShoppingNeeded(); renderExpiringPanel(); }
   ['manItemName','manItemQty','manItemUnit','manItemPar','manItemExpiry'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('manItemTrack').checked = false;
 });
@@ -1355,8 +1618,8 @@ function buildScanResultRow(it){
 
 // ---------------- LEFTOVERS ----------------
 async function loadLeftovers(){
-  const { data } = await supabase.from('leftovers').select('*').eq('household_id', household.id).order('created_at', {ascending:false}).limit(30);
-  leftovers = data || [];
+  const { data, error } = await safeDb(supabase.from('leftovers').select('*').eq('household_id', household.id).order('created_at', {ascending:false}).limit(30), 'Could not load leftovers');
+  if(!error) leftovers = data || [];
   renderLeftovers();
 }
 function renderLeftovers(){
@@ -1368,42 +1631,149 @@ function renderLeftovers(){
     const row = el('div', {class:'row', style:'justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--line);'});
     row.appendChild(el('div', {text: `${l.recipe_title||'Recipe'} — ${l.amount} (${ageDays}d old)`}));
     const eatBtn = el('button', {class:'btn ghost small', type:'button', text:'Mark eaten'});
-    eatBtn.addEventListener('click', async () => { await supabase.from('leftovers').update({consumed_at:new Date().toISOString()}).eq('id', l.id); l.consumed_at = new Date().toISOString(); renderLeftovers(); });
+    eatBtn.addEventListener('click', async () => {
+      const { error } = await safeDb(supabase.from('leftovers').update({consumed_at:new Date().toISOString()}).eq('id', l.id), 'Could not mark the leftover as eaten');
+      if(error) return;
+      l.consumed_at = new Date().toISOString(); renderLeftovers();
+    });
     row.appendChild(eatBtn);
     wrap.appendChild(row);
   });
 }
 
-// ---------------- MARK AS COOKED: pantry deduction + leftover prompt ----------------
+// ---------------- INGREDIENT NAME / UNIT NORMALIZATION ----------------
+// Conservative on purpose: a wrong match silently corrupts the stock register,
+// a missed match just means the user adjusts by hand.
+const INGREDIENT_SYNONYMS = {
+  'scallion':'spring onion', 'scallions':'spring onion', 'green onion':'spring onion',
+  'cilantro':'coriander', 'zucchini':'courgette', 'eggplant':'aubergine',
+  'garbanzo bean':'chickpea', 'garbanzo':'chickpea',
+  'bell pepper':'pepper', 'capsicum':'pepper',
+  'mince':'minced beef', 'ground beef':'minced beef',
+  'rocket':'rocket', 'arugula':'rocket',
+  'corn':'sweetcorn', 'maize':'sweetcorn',
+  'tinned tomato':'tinned tomatoes', 'canned tomato':'tinned tomatoes', 'canned tomatoes':'tinned tomatoes'
+};
+function singularize(word){
+  if(word.length <= 3) return word;
+  if(word.endsWith('ies')) return word.slice(0,-3) + 'y';
+  if(word.endsWith('oes')) return word.slice(0,-2);
+  if(word.endsWith('ses') || word.endsWith('xes') || word.endsWith('zes') || word.endsWith('ches') || word.endsWith('shes')) return word.slice(0,-2);
+  if(word.endsWith('ss')) return word;
+  if(word.endsWith('s')) return word.slice(0,-1);
+  return word;
+}
+function normalizeIngredientName(name){
+  let s = (name||'').toLowerCase()
+    .replace(/\(.*?\)/g, ' ')                 // "(optional)", "(diced)"
+    .replace(/[.,;:!?"'’·]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if(INGREDIENT_SYNONYMS[s]) s = INGREDIENT_SYNONYMS[s];
+  const words = s.split(' ').map(singularize);
+  let joined = words.join(' ');
+  if(INGREDIENT_SYNONYMS[joined]) joined = INGREDIENT_SYNONYMS[joined];
+  return joined;
+}
+function namesMatch(a, b){
+  const na = normalizeIngredientName(a), nb = normalizeIngredientName(b);
+  if(!na || !nb) return false;
+  if(na === nb) return true;
+  // whole-word containment only ("onion" must not match "spring onion" one-way surprises;
+  // require the shorter name to appear as a whole-word phrase inside the longer)
+  const shorter = na.length <= nb.length ? na : nb;
+  const longer = na.length <= nb.length ? nb : na;
+  return new RegExp('(^| )' + shorter.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '( |$)').test(longer);
+}
+// Convert an amount between unit families where it is safe to do so. Returns null
+// when the conversion isn't safe to guess.
+function unitToBase(amount, unit){
+  const u = (unit||'').toLowerCase().replace(/\./g,'').trim();
+  if(['g','gram','grams'].includes(u)) return { qty: amount, base:'g' };
+  if(['kg','kilogram','kilograms'].includes(u)) return { qty: amount*1000, base:'g' };
+  if(['ml','millilitre','millilitres','milliliter','milliliters'].includes(u)) return { qty: amount, base:'ml' };
+  if(['l','litre','litres','liter','liters'].includes(u)) return { qty: amount*1000, base:'ml' };
+  if(['tsp','teaspoon','teaspoons'].includes(u)) return { qty: amount*5, base:'ml' };
+  if(['tbsp','tablespoon','tablespoons'].includes(u)) return { qty: amount*15, base:'ml' };
+  if(['','x','piece','pieces','pc','pcs','count','item','items','unit','units','tin','tins','can','cans','pack','packs','clove','cloves','egg','eggs'].includes(u)) return { qty: amount, base:'count:'+u };
+  return null;
+}
 function convertUnits(amount, fromUnit, toUnit){
-  if(!fromUnit || !toUnit || fromUnit === toUnit) return amount;
-  const f = fromUnit.toLowerCase(), t = toUnit.toLowerCase();
-  if(f==='kg' && t==='g') return amount*1000;
-  if(f==='g' && t==='kg') return amount/1000;
-  if(f==='l' && t==='ml') return amount*1000;
-  if(f==='ml' && t==='l') return amount/1000;
-  return null; // unknown conversion, don't guess
+  const f = (fromUnit||'').toLowerCase().trim(), t = (toUnit||'').toLowerCase().trim();
+  if(f === t) return amount;
+  const from = unitToBase(amount, fromUnit), to = unitToBase(1, toUnit);
+  if(!from || !to) return null;
+  if(from.base.startsWith('count:') && to.base.startsWith('count:')){
+    // pieces/count only convert when they are literally the same unit word
+    return f === t ? amount : null;
+  }
+  if(from.base !== to.base) return null;
+  return from.qty / to.qty; // to.qty is the base-size of 1 target unit
 }
 
-async function deductPantryForRecipe(recipe){
-  const notTracked = [];
+// ---------------- MARK AS COOKED: reviewed pantry deduction + leftover prompt ----------------
+function computePantryDeductions(recipe){
+  const proposals = [];
   const trackedItems = pantryItems.filter(p => p.track_consumption);
   for(const ing of (recipe.ingredients||[])){
-    const match = trackedItems.find(p => (ing.item||'').toLowerCase().includes(p.name.toLowerCase()) || p.name.toLowerCase().includes((ing.item||'').toLowerCase()));
-    if(!match){ continue; }
+    const match = trackedItems.find(p => namesMatch(ing.item, p.name));
+    if(!match) continue;
     const amt = parseFloat(ing.amount);
-    if(isNaN(amt)){ notTracked.push(ing.item); continue; }
+    if(isNaN(amt)) continue;
     const converted = convertUnits(amt, ing.unit, match.unit);
-    if(converted === null){ notTracked.push(ing.item); continue; }
-    const previousQuantity = match.quantity;
-    match.quantity = Math.max(0, match.quantity - converted);
-    const { error } = await supabase.from('pantry_items').update({ quantity: match.quantity }).eq('id', match.id);
-    if(error){ console.error('Pantry deduction failed to save for', match.name, error); match.quantity = previousQuantity; }
-    else { lastDeduction.push({ id: match.id, previousQuantity }); }
+    if(converted === null) continue;
+    if(proposals.some(pr => pr.item.id === match.id)){
+      const existing = proposals.find(pr => pr.item.id === match.id);
+      existing.deduct += converted;
+      continue;
+    }
+    proposals.push({ item: match, ingredient: ing.item, deduct: converted });
   }
-  renderPantryList(); renderShoppingNeeded();
-  return notTracked;
+  return proposals;
 }
+
+let deductContext = null;
+function openDeductModal(recipe, onDone){
+  const proposals = computePantryDeductions(recipe);
+  deductContext = { proposals, onDone };
+  const rows = document.getElementById('deductRows'); rows.innerHTML = '';
+  document.getElementById('deductNoneMsg').classList.toggle('hidden', proposals.length > 0);
+  document.getElementById('deductApplyBtn').disabled = proposals.length === 0;
+  proposals.forEach((p, idx) => {
+    const newQty = Math.max(0, p.item.quantity - p.deduct);
+    const row = el('label', {class:'row', style:'justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--line); cursor:pointer;'});
+    const cb = el('input', {type:'checkbox', 'data-idx':idx}); cb.checked = true;
+    const left = el('div', {class:'row', style:'gap:8px; flex:1;'}, [cb]);
+    left.appendChild(el('div', {}, [
+      el('div', {text: p.item.name, style:'font-weight:600; font-size:13.5px;'}),
+      el('div', {class:'hint', text: `${p.item.quantity} → ${Number(newQty.toFixed(2))} ${p.item.unit||''} (uses ${Number(p.deduct.toFixed(2))} ${p.item.unit||''} for "${p.ingredient}")`})
+    ]));
+    row.appendChild(left);
+    rows.appendChild(row);
+  });
+  document.getElementById('deductModal').classList.remove('hidden');
+}
+document.getElementById('deductCancelBtn').addEventListener('click', () => {
+  document.getElementById('deductModal').classList.add('hidden');
+  if(deductContext){ const cb = deductContext.onDone; deductContext = null; cb([]); }
+});
+document.getElementById('deductApplyBtn').addEventListener('click', async () => {
+  if(!deductContext) return;
+  const ticked = [...document.querySelectorAll('#deductRows input[type=checkbox]')].filter(c => c.checked).map(c => deductContext.proposals[Number(c.dataset.idx)]);
+  const applied = [];
+  for(const p of ticked){
+    const previousQuantity = p.item.quantity;
+    const newQty = Math.max(0, previousQuantity - p.deduct);
+    const { error } = await safeDb(supabase.from('pantry_items').update({ quantity: newQty, updated_at: new Date().toISOString() }).eq('id', p.item.id), 'Could not update stock for ' + p.item.name);
+    if(error) continue;
+    p.item.quantity = newQty;
+    applied.push({ id: p.item.id, previousQuantity });
+  }
+  renderPantryList(); renderShoppingNeeded(); renderExpiringPanel();
+  document.getElementById('deductModal').classList.add('hidden');
+  if(applied.length) showToast(`Stock updated for ${applied.length} item(s)`);
+  const cb = deductContext.onDone; deductContext = null; cb(applied);
+});
 
 let leftoverRecipeContext = null;
 function openLeftoverModal(recipe){
@@ -1413,10 +1783,10 @@ function openLeftoverModal(recipe){
 document.querySelectorAll('#leftoverChips .chip').forEach(chip => {
   chip.addEventListener('click', async () => {
     if(leftoverRecipeContext){
-      await supabase.from('leftovers').insert({
+      await safeDb(supabase.from('leftovers').insert({
         household_id: household.id, recipe_id: leftoverRecipeContext.id || null,
         recipe_title: leftoverRecipeContext.title, amount: chip.dataset.amt
-      });
+      }), 'Could not log the leftovers');
     }
     document.getElementById('leftoverModal').classList.add('hidden');
     loadLeftovers();
@@ -1427,9 +1797,11 @@ document.getElementById('skipLeftoverBtn').addEventListener('click', () => docum
 
 async function loadFavourites(){
   const body = document.getElementById('favouritesBody');
-  const { data } = await supabase.from('recipes').select('*').eq('household_id', household.id).eq('is_favourite', true).order('generated_at', {ascending:false});
+  const { data, error } = await safeDb(supabase.from('recipes').select('*').eq('household_id', household.id).eq('is_favourite', true).order('generated_at', {ascending:false}), 'Could not load favourites');
+  if(error) return;
   body.innerHTML = '';
   if(!data || !data.length){ body.appendChild(el('div', {class:'panel', text:'No favourites saved yet.'})); return; }
+  await preloadTagsForRecipes(data.map(r => r.id));
   data.forEach(r => body.appendChild(buildRecipeCard(r, [])));
 }
 
@@ -1455,6 +1827,8 @@ function openRatingModal(recipe){
     row.appendChild(stars);
     wrap.appendChild(row);
   });
+  const tagWrap = document.getElementById('ratingQuickTags'); tagWrap.innerHTML = '';
+  tagWrap.appendChild(buildQuickTagChips(recipe.id));
   document.getElementById('ratingComment').value = '';
   document.getElementById('ratingModal').classList.remove('hidden');
 }
@@ -1548,6 +1922,898 @@ document.addEventListener('visibilitychange', async () => {
     try { wakeLock = await navigator.wakeLock.request('screen'); } catch(e){}
   }
 });
+
+// ---------------- QUICK FEEDBACK TAGS ----------------
+const QUICK_TAGS = ['great taste','make again','wife liked it','child liked it','high protein win','good for leftovers','too expensive','too much effort','too many dishes','too bland','avoid next time'];
+
+async function preloadTagsForRecipes(ids){
+  if(!ids.length) return;
+  const { data, error } = await safeDb(supabase.from('recipe_feedback_tags').select('recipe_id,tag').eq('profile_id', session.user.id).in('recipe_id', ids), 'Could not load your feedback tags');
+  if(error) return;
+  ids.forEach(id => { recipeTagsCache[id] = recipeTagsCache[id] || new Set(); });
+  (data||[]).forEach(t => {
+    if(!recipeTagsCache[t.recipe_id]) recipeTagsCache[t.recipe_id] = new Set();
+    recipeTagsCache[t.recipe_id].add(t.tag);
+  });
+}
+function myTags(recipeId){
+  if(!recipeTagsCache[recipeId]) recipeTagsCache[recipeId] = new Set();
+  return recipeTagsCache[recipeId];
+}
+async function toggleTag(recipeId, tag, chipEl){
+  const mine = myTags(recipeId);
+  const had = mine.has(tag);
+  if(had){
+    const { error } = await safeDb(supabase.from('recipe_feedback_tags').delete().eq('recipe_id', recipeId).eq('profile_id', session.user.id).eq('tag', tag), 'Could not remove the tag');
+    if(error) return;
+    mine.delete(tag);
+  } else {
+    const { error } = await safeDb(supabase.from('recipe_feedback_tags').insert({ recipe_id: recipeId, profile_id: session.user.id, tag }), 'Could not save the tag');
+    if(error) return;
+    mine.add(tag);
+  }
+  if(chipEl) chipEl.classList.toggle('on', !had);
+}
+function buildQuickTagChips(recipeId){
+  const wrap = el('div', {class:'chip-grid', style:'margin-bottom:0; gap:6px;'});
+  QUICK_TAGS.forEach(tag => {
+    const chip = el('button', {class:'qf-chip' + (myTags(recipeId).has(tag) ? ' on' : ''), type:'button', text: tag});
+    chip.addEventListener('click', () => toggleTag(recipeId, tag, chip));
+    wrap.appendChild(chip);
+  });
+  return wrap;
+}
+function buildQuickTagRow(r){
+  const details = el('details', {style:'margin-top:12px;'});
+  if(myTags(r.id).size) details.setAttribute('open', '');
+  const sum = el('summary', {text:'Quick feedback', style:"cursor:pointer; font-family:'IBM Plex Mono',monospace; font-size:11.5px; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-dim);"});
+  details.appendChild(sum);
+  const inner = el('div', {style:'margin-top:8px;'});
+  inner.appendChild(buildQuickTagChips(r.id));
+  details.appendChild(inner);
+  return details;
+}
+
+// ---------------- ORDER MODE / PERSISTENT SHOPPING LISTS ----------------
+const RETAILERS = ["Tesco Ireland","Dunnes Stores","SuperValu","Lidl Ireland","Aldi Ireland","M&S Food","SPAR","Centra","Manual / Other"];
+const FULFIL_LABELS = { delivery:'Delivery', click_collect:'Click & Collect', in_store:'In-store shopping', whatsapp:'WhatsApp list only' };
+const ITEM_STATUS_CYCLE = ['required','optional','check_pantry','already_have','bought'];
+const ITEM_STATUS_LABELS = { required:'required', optional:'optional', check_pantry:'check pantry', already_have:'already have', bought:'bought' };
+
+function switchToTab(name){
+  document.querySelectorAll('.tabs button').forEach(b => {
+    if(b.dataset.tab === name) b.click();
+  });
+}
+
+async function loadShoppingLists(){
+  const { data, error } = await safeDb(supabase.from('shopping_lists').select('*, shopping_list_items(count)').eq('household_id', household.id).order('created_at', {ascending:false}), 'Could not load shopping lists');
+  if(!error) shoppingLists = data || [];
+  renderShoppingListCards();
+}
+
+function renderShoppingListCards(){
+  const wrap = document.getElementById('slListCards'); wrap.innerHTML = '';
+  if(!shoppingLists.length){
+    wrap.appendChild(el('div', {class:'hint', text:'No shopping lists yet. Create one above, add one from a recipe card ("Add to shopping list"), from low-stock items in Koskas, or from the meal plan.'}));
+    return;
+  }
+  shoppingLists.forEach(l => {
+    const count = l.shopping_list_items?.[0]?.count ?? 0;
+    const card = el('div', {class:'panel list-card', style:'padding:14px 16px; margin-bottom:10px;'});
+    const top = el('div', {class:'row', style:'justify-content:space-between;'});
+    const left = el('div');
+    left.appendChild(el('div', {style:'font-weight:600;', text: l.title}));
+    left.appendChild(el('div', {class:'hint', text: [
+      l.status, FULFIL_LABELS[l.fulfilment_method] || l.fulfilment_method, l.retailer_name,
+      count + ' item' + (count === 1 ? '' : 's'),
+      new Date(l.created_at).toLocaleDateString('en-IE')
+    ].filter(Boolean).join(' · ')}));
+    top.appendChild(left);
+    top.appendChild(el('span', {class:'status-pill ' + (l.status === 'completed' ? 'already_have' : 'required'), text: l.status}));
+    card.appendChild(top);
+    card.addEventListener('click', () => openListDetail(l.id));
+    wrap.appendChild(card);
+  });
+}
+
+document.getElementById('newListBtn').addEventListener('click', async () => {
+  const input = document.getElementById('newListTitle');
+  const title = input.value.trim() || 'Shopping list';
+  const { data, error } = await safeDb(supabase.from('shopping_lists').insert({
+    household_id: household.id, title, source:'manual', created_by: session.user.id
+  }).select().single(), 'Could not create the list');
+  if(error) return;
+  input.value = '';
+  shoppingLists.unshift(data);
+  openListDetail(data.id);
+});
+
+// Reuse the most recent draft list, or create one. Used by recipe cards, Koskas and the meal plan.
+async function ensureDraftList(title, source){
+  await loadShoppingLists();
+  const draft = shoppingLists.find(l => l.status === 'draft');
+  if(draft) return draft;
+  const { data, error } = await safeDb(supabase.from('shopping_lists').insert({
+    household_id: household.id, title, source, created_by: session.user.id
+  }).select().single(), 'Could not create a shopping list');
+  if(error) return null;
+  shoppingLists.unshift(data);
+  return data;
+}
+
+async function addItemsToList(list, items){
+  if(!items.length) return true;
+  const { count } = await supabase.from('shopping_list_items').select('*', { count:'exact', head:true }).eq('shopping_list_id', list.id);
+  const base = count || 0;
+  const rows = items.map((it, i) => ({
+    shopping_list_id: list.id, household_id: household.id,
+    item_name: it.item_name, quantity: it.quantity ?? null, unit: it.unit ?? null,
+    quantity_text: it.quantity_text ?? null, category: it.category ?? null, notes: it.notes ?? null,
+    status: it.status || 'required', source: it.source || 'manual',
+    recipe_id: it.recipe_id ?? null, pantry_item_id: it.pantry_item_id ?? null,
+    sort_order: base + i
+  }));
+  const { error } = await safeDb(supabase.from('shopping_list_items').insert(rows), 'Could not add items to the list');
+  return !error;
+}
+
+// Pantry-aware conversion of recipe ingredients into shopping list items. Conservative:
+// full pantry coverage marks the line "already have", uncertain matches "check pantry",
+// nothing is silently dropped.
+function ingredientToListItem(ing, recipeId){
+  const item = {
+    item_name: ing.item || 'item',
+    quantity_text: [ing.amount, ing.unit].filter(Boolean).join(' ') || null,
+    recipe_id: recipeId || null, source:'recipe', status:'required'
+  };
+  const amt = parseFloat(ing.amount);
+  if(!isNaN(amt)){ item.quantity = amt; item.unit = ing.unit || null; }
+  const match = pantryItems.find(p => namesMatch(ing.item, p.name));
+  if(match && match.quantity > 0){
+    const conv = isNaN(amt) ? null : convertUnits(amt, ing.unit, match.unit);
+    if(conv === null){
+      item.status = 'check_pantry';
+      item.notes = `pantry shows ${match.quantity}${match.unit ? ' ' + match.unit : ''} of ${match.name} — check before buying`;
+    } else if(match.quantity >= conv){
+      item.status = 'already_have';
+      item.notes = `pantry shows enough (${match.quantity}${match.unit ? ' ' + match.unit : ''})`;
+    } else {
+      const needed = conv - match.quantity;
+      item.quantity = Number(needed.toFixed(2));
+      item.unit = match.unit || item.unit;
+      item.quantity_text = `${item.quantity}${item.unit ? ' ' + item.unit : ''} (reduced — pantry has ${match.quantity}${match.unit ? ' ' + match.unit : ''})`;
+      item.notes = 'quantity reduced by pantry stock';
+    }
+    item.pantry_item_id = match.id;
+  }
+  return item;
+}
+
+async function addRecipeToShoppingList(r){
+  const list = await ensureDraftList('Shopping for ' + (r.title || 'recipes'), 'recipe');
+  if(!list) return;
+  const items = (r.ingredients||[]).map(ing => ingredientToListItem(ing, r.id || null));
+  const ok = await addItemsToList(list, items);
+  if(!ok) return;
+  showToast('Added ' + items.length + ' ingredient(s) to "' + list.title + '"');
+  openShoppingTab(list.id);
+}
+
+function openShoppingTab(listId){
+  switchToTab('shopping');
+  if(listId) openListDetail(listId);
+}
+
+async function openListDetail(listId){
+  const { data: list, error } = await safeDb(supabase.from('shopping_lists').select('*').eq('id', listId).single(), 'Could not open the list');
+  if(error) return;
+  const { data: items, error: itemsErr } = await safeDb(supabase.from('shopping_list_items').select('*').eq('shopping_list_id', listId).order('sort_order'), 'Could not load the list items');
+  if(itemsErr) return;
+  currentList = list;
+  currentListItems = items || [];
+  document.getElementById('slOverviewPanel').classList.add('hidden');
+  document.getElementById('slDetailPanel').classList.remove('hidden');
+  renderListDetail();
+}
+
+function closeListDetail(){
+  currentList = null; currentListItems = [];
+  document.getElementById('slDetailPanel').classList.add('hidden');
+  document.getElementById('slOverviewPanel').classList.remove('hidden');
+  loadShoppingLists();
+}
+document.getElementById('slBackBtn').addEventListener('click', closeListDetail);
+
+async function updateCurrentList(fields, friendly){
+  const { error } = await safeDb(supabase.from('shopping_lists').update({ ...fields, updated_at: new Date().toISOString() }).eq('id', currentList.id), friendly);
+  if(!error) Object.assign(currentList, fields);
+  return !error;
+}
+
+function renderListDetail(){
+  const l = currentList;
+  document.getElementById('slDetailTitle').textContent = l.title;
+  document.getElementById('slDetailSub').textContent = `Status: ${l.status} · created ${new Date(l.created_at).toLocaleDateString('en-IE')}. Everything here saves automatically for the whole household.`;
+  document.querySelectorAll('#slFulfilChips .chip').forEach(c => c.classList.toggle('selected', c.dataset.fm === l.fulfilment_method));
+  const sel = document.getElementById('slRetailerSelect');
+  sel.innerHTML = '';
+  sel.appendChild(el('option', {value:'', text:'— choose a retailer —'}));
+  RETAILERS.forEach(rname => sel.appendChild(el('option', {value:rname, text:rname})));
+  sel.value = l.retailer_name || '';
+  renderRetailerInfo();
+  renderListItems();
+  document.getElementById('slCompleteBtn').classList.toggle('hidden', l.status === 'completed');
+  document.getElementById('slReopenBtn').classList.toggle('hidden', l.status !== 'completed');
+}
+
+function renderRetailerInfo(){
+  const info = SHOP_FULFILMENT[currentList.retailer_name];
+  const box = document.getElementById('slRetailerInfo');
+  const linkRow = document.getElementById('slRetailerLinkRow');
+  linkRow.innerHTML = '';
+  if(!currentList.retailer_name || currentList.retailer_name === 'Manual / Other'){
+    box.textContent = currentList.retailer_name ? 'No retailer site on file — use WhatsApp, print or copy below.' : '';
+    return;
+  }
+  if(info){
+    const bits = [];
+    bits.push('Delivery: ' + (info.delivery === true ? 'available' : 'unknown — check their site'));
+    bits.push('Click & Collect: ' + (info.collect === true ? 'available' : 'unknown — check their site'));
+    box.textContent = bits.join(' · ') + '. ' + info.note + (info.delivery === null ? ' (Unverified — details may be out of date.)' : '');
+    const a = el('a', {href: info.url, target:'_blank', rel:'noopener', class:'btn ghost small', style:'text-decoration:none;', text:'Open ' + currentList.retailer_name + ' shopping'});
+    linkRow.appendChild(a);
+    linkRow.appendChild(el('span', {class:'hint', style:'margin-top:0;', text:'Opens their site — Kook vir Jou cannot add items to their basket or place the order.'}));
+  } else {
+    box.textContent = 'No fulfilment details on file for this retailer.';
+  }
+}
+
+document.querySelectorAll('#slFulfilChips .chip').forEach(chip => {
+  chip.addEventListener('click', async () => {
+    if(!currentList) return;
+    const ok = await updateCurrentList({ fulfilment_method: chip.dataset.fm }, 'Could not save the fulfilment choice');
+    if(ok) document.querySelectorAll('#slFulfilChips .chip').forEach(c => c.classList.toggle('selected', c === chip));
+  });
+});
+
+document.getElementById('slRetailerSelect').addEventListener('change', async (e) => {
+  if(!currentList) return;
+  const ok = await updateCurrentList({ retailer_name: e.target.value || null }, 'Could not save the retailer');
+  if(ok) renderRetailerInfo();
+});
+
+function renderListItems(){
+  const wrap = document.getElementById('slItems'); wrap.innerHTML = '';
+  if(!currentListItems.length){
+    wrap.appendChild(el('div', {class:'hint', text:'No items yet — add some below, or send a recipe here with "Add to shopping list".'}));
+    return;
+  }
+  currentListItems.forEach(item => wrap.appendChild(buildListItemRow(item)));
+}
+
+function buildListItemRow(item){
+  const row = el('div', {class:'sl-item ' + item.status});
+  const pill = el('button', {class:'status-pill ' + item.status, type:'button', text: ITEM_STATUS_LABELS[item.status] || item.status});
+  pill.addEventListener('click', async () => {
+    const next = ITEM_STATUS_CYCLE[(ITEM_STATUS_CYCLE.indexOf(item.status) + 1) % ITEM_STATUS_CYCLE.length];
+    const { error } = await safeDb(supabase.from('shopping_list_items').update({ status: next }).eq('id', item.id), 'Could not update the item');
+    if(error) return;
+    item.status = next;
+    row.className = 'sl-item ' + next;
+    pill.className = 'status-pill ' + next;
+    pill.textContent = ITEM_STATUS_LABELS[next];
+  });
+  row.appendChild(pill);
+
+  const saveField = async (field, value, input) => {
+    const { error } = await safeDb(supabase.from('shopping_list_items').update({ [field]: value }).eq('id', item.id), 'Could not save the change');
+    if(error){ input.value = item[field] ?? ''; return; }
+    item[field] = value;
+  };
+  const nameWrap = el('span', {class:'sl-name', style:'flex:2; min-width:130px;'});
+  const nameInput = el('input', {type:'text'}); nameInput.value = item.item_name;
+  nameInput.addEventListener('change', () => saveField('item_name', nameInput.value.trim() || item.item_name, nameInput));
+  nameWrap.appendChild(nameInput);
+  row.appendChild(nameWrap);
+
+  const qtyInput = el('input', {type:'number', step:'0.1', placeholder:'qty', style:'width:70px;'});
+  if(item.quantity != null) qtyInput.value = item.quantity;
+  qtyInput.addEventListener('change', () => saveField('quantity', qtyInput.value === '' ? null : parseFloat(qtyInput.value), qtyInput));
+  row.appendChild(qtyInput);
+
+  const unitInput = el('input', {type:'text', placeholder:'unit', style:'width:64px;'});
+  unitInput.value = item.unit || '';
+  unitInput.addEventListener('change', () => saveField('unit', unitInput.value.trim() || null, unitInput));
+  row.appendChild(unitInput);
+
+  const notesInput = el('input', {type:'text', placeholder:'notes / substitutions, e.g. gluten-free only', style:'flex:3; min-width:170px;'});
+  notesInput.value = item.notes || '';
+  notesInput.addEventListener('change', () => saveField('notes', notesInput.value.trim() || null, notesInput));
+  row.appendChild(notesInput);
+
+  const del = el('button', {class:'icon-btn', type:'button', text:'✕', title:'Remove', style:'color:var(--text-dim);'});
+  del.addEventListener('click', async () => {
+    const { error } = await safeDb(supabase.from('shopping_list_items').delete().eq('id', item.id), 'Could not remove the item');
+    if(error) return;
+    currentListItems = currentListItems.filter(i => i.id !== item.id);
+    row.remove();
+  });
+  row.appendChild(del);
+
+  if(item.quantity_text && item.quantity == null){
+    row.appendChild(el('div', {class:'hint', style:'width:100%; margin-top:2px;', text: item.quantity_text}));
+  }
+  return row;
+}
+
+document.getElementById('slExtraAdd').addEventListener('click', async () => {
+  const input = document.getElementById('slExtraInput');
+  const name = input.value.trim();
+  if(!name || !currentList) return;
+  const ok = await addItemsToList(currentList, [{ item_name: name }]);
+  if(!ok) return;
+  input.value = '';
+  openListDetail(currentList.id);
+});
+document.getElementById('slExtraInput').addEventListener('keydown', e => {
+  if(e.key === 'Enter'){ e.preventDefault(); document.getElementById('slExtraAdd').click(); }
+});
+
+document.getElementById('slAddLowStockBtn').addEventListener('click', async () => {
+  if(!currentList) return;
+  const low = lowStockItems().filter(i => !currentListItems.some(it => it.pantry_item_id === i.id));
+  if(!low.length){ showToast('No low-stock items to add'); return; }
+  const ok = await addItemsToList(currentList, low.map(i => ({
+    item_name: i.name,
+    quantity_text: `have ${i.quantity}${i.unit?(' '+i.unit):''}, keep ≥ ${i.par_level}`,
+    pantry_item_id: i.id, source:'low_stock'
+  })));
+  if(ok) openListDetail(currentList.id);
+});
+
+function buildListExportText(){
+  const l = currentList;
+  const lines = ['🛒 ' + l.title + ' — Kook vir Jou'];
+  lines.push('Fulfilment: ' + (FULFIL_LABELS[l.fulfilment_method] || l.fulfilment_method) + (l.retailer_name ? ' · Shop: ' + l.retailer_name : ''));
+  lines.push('');
+  const groups = [
+    ['To buy', currentListItems.filter(i => i.status === 'required')],
+    ['Optional', currentListItems.filter(i => i.status === 'optional')],
+    ['Check the pantry first', currentListItems.filter(i => i.status === 'check_pantry')],
+    ['Already have', currentListItems.filter(i => i.status === 'already_have')],
+    ['Bought', currentListItems.filter(i => i.status === 'bought')]
+  ];
+  groups.forEach(([label, items]) => {
+    if(!items.length) return;
+    lines.push(label + ':');
+    items.forEach(i => {
+      let line = '• ' + i.item_name;
+      const q = i.quantity != null ? `${i.quantity}${i.unit ? ' ' + i.unit : ''}` : (i.quantity_text || '');
+      if(q) line += ' — ' + q;
+      if(i.notes) line += ' (' + i.notes + ')';
+      lines.push(line);
+    });
+    lines.push('');
+  });
+  const avoid = [...(household.allergies||[]), ...(household.diets||[])];
+  if(avoid.length){
+    lines.push('⚠️ This household avoids: ' + avoid.join(', ') + '. Check every product label — especially for Coeliac / gluten-free safety. This list is not an allergen guarantee.');
+  }
+  return lines.join('\n').trim();
+}
+
+document.getElementById('slWhatsAppBtn').addEventListener('click', () => {
+  if(!currentList) return;
+  window.open('https://wa.me/?text=' + encodeURIComponent(buildListExportText()), '_blank');
+});
+document.getElementById('slCopyBtn').addEventListener('click', async () => {
+  if(!currentList) return;
+  try { await navigator.clipboard.writeText(buildListExportText()); showToast('Copied to clipboard'); }
+  catch(e){ showToast('Could not copy: ' + e.message, true); }
+});
+document.getElementById('slDownloadBtn').addEventListener('click', () => {
+  if(!currentList) return;
+  const blob = new Blob([buildListExportText()], {type:'text/plain'});
+  const a = el('a', {href: URL.createObjectURL(blob), download: (currentList.title||'shopping-list').replace(/[^a-z0-9]+/gi,'-').toLowerCase() + '.txt'});
+  document.body.appendChild(a); a.click(); a.remove();
+});
+document.getElementById('slPrintBtn').addEventListener('click', () => {
+  if(!currentList) return;
+  const area = document.getElementById('printArea');
+  area.innerHTML = '';
+  buildListExportText().split('\n').forEach((line, idx) => {
+    if(idx === 0) area.appendChild(el('h1', {text: line}));
+    else if(line.endsWith(':')) area.appendChild(el('h2', {text: line}));
+    else if(line) area.appendChild(el('p', {text: line, style:'margin:2px 0;'}));
+  });
+  area.classList.remove('hidden');
+  window.print();
+  area.classList.add('hidden');
+});
+
+document.getElementById('slCompleteBtn').addEventListener('click', async () => {
+  if(!currentList) return;
+  if(await updateCurrentList({ status:'completed' }, 'Could not mark the list completed')){ showToast('List completed'); renderListDetail(); }
+});
+document.getElementById('slReopenBtn').addEventListener('click', async () => {
+  if(!currentList) return;
+  if(await updateCurrentList({ status:'draft' }, 'Could not reopen the list')){ showToast('List reopened'); renderListDetail(); }
+});
+document.getElementById('slDeleteBtn').addEventListener('click', async () => {
+  if(!currentList) return;
+  if(!confirm('Delete "' + currentList.title + '" and its items? This cannot be undone.')) return;
+  const { error } = await safeDb(supabase.from('shopping_lists').delete().eq('id', currentList.id), 'Could not delete the list');
+  if(error) return;
+  showToast('List deleted');
+  closeListDetail();
+});
+
+// ---------------- MEAL PLAN ----------------
+const MP_SLOTS = ['breakfast','lunch','dinner'];
+
+function mondayOf(d){
+  const date = new Date(d); date.setHours(0,0,0,0);
+  const day = (date.getDay() + 6) % 7; // Monday = 0
+  date.setDate(date.getDate() - day);
+  return date;
+}
+// local-date formatting on purpose: toISOString() is UTC and would shift
+// local-midnight dates back a day during Irish summer time
+function isoDate(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+
+async function loadMealPlan(){
+  if(!mpWeekStart) mpWeekStart = mondayOf(new Date());
+  const weekStr = isoDate(mpWeekStart);
+  const weekEnd = new Date(mpWeekStart); weekEnd.setDate(weekEnd.getDate() + 6);
+  const { data: plan } = await safeDb(supabase.from('meal_plans').select('*').eq('household_id', household.id).eq('week_start', weekStr).maybeSingle(), 'Could not load the meal plan');
+  mpPlan = plan || null;
+  const { data: items, error } = await safeDb(supabase.from('meal_plan_items')
+    .select('*, recipes(id,title,servings,ingredients)')
+    .eq('household_id', household.id)
+    .gte('meal_date', weekStr).lte('meal_date', isoDate(weekEnd))
+    .order('meal_date'), 'Could not load planned meals');
+  if(!error) mpItems = items || [];
+  mpSelected = new Set();
+  renderMealPlan();
+}
+
+async function ensurePlanRow(){
+  if(mpPlan) return mpPlan;
+  const weekStr = isoDate(mpWeekStart);
+  const { data, error } = await safeDb(supabase.from('meal_plans')
+    .upsert({ household_id: household.id, week_start: weekStr }, { onConflict:'household_id,week_start' })
+    .select().single(), 'Could not create the week plan');
+  if(error) return null;
+  mpPlan = data;
+  return mpPlan;
+}
+
+function mealTitle(m){
+  if(m.recipes?.title) return m.recipes.title + (m.use_leftovers ? ' (leftovers)' : '');
+  if(m.manual_title) return m.manual_title + (m.use_leftovers ? ' (leftovers)' : '');
+  return 'Meal';
+}
+
+function renderMealPlan(){
+  const weekEnd = new Date(mpWeekStart); weekEnd.setDate(weekEnd.getDate() + 6);
+  document.getElementById('mpWeekTitle').textContent = 'Week of ' + mpWeekStart.toLocaleDateString('en-IE', {day:'numeric', month:'short'}) + ' – ' + weekEnd.toLocaleDateString('en-IE', {day:'numeric', month:'short'});
+  const grid = document.getElementById('mpGrid'); grid.innerHTML = '';
+  const todayStr = isoDate(new Date(new Date().setHours(0,0,0,0)));
+  for(let i=0;i<7;i++){
+    const day = new Date(mpWeekStart); day.setDate(day.getDate() + i);
+    const dayStr = isoDate(day);
+    const card = el('div', {class:'mp-day' + (dayStr === todayStr ? ' today' : '')});
+    const head = el('div', {class:'mp-day-head'});
+    head.appendChild(el('span', {text: day.toLocaleDateString('en-IE', {weekday:'long', day:'numeric', month:'short'})}));
+    const dayListBtn = el('button', {class:'btn ghost small', type:'button', text:'List for this day', style:'padding:4px 10px; font-size:11px;'});
+    dayListBtn.addEventListener('click', () => createListFromMeals(mpItems.filter(m => m.meal_date === dayStr), 'Meals on ' + day.toLocaleDateString('en-IE', {weekday:'short', day:'numeric', month:'short'})));
+    head.appendChild(dayListBtn);
+    card.appendChild(head);
+    MP_SLOTS.forEach(slot => {
+      const slotRow = el('div', {class:'mp-slot'});
+      slotRow.appendChild(el('div', {class:'slot-label', text: slot}));
+      const body = el('div', {class:'slot-body'});
+      mpItems.filter(m => m.meal_date === dayStr && m.meal_slot === slot).forEach(m => {
+        const meal = el('div', {class:'mp-meal'});
+        const left = el('div', {class:'row', style:'gap:8px; flex:1;'});
+        const cb = el('input', {type:'checkbox', title:'Tick to include in "Shopping list: ticked meals"'});
+        cb.checked = mpSelected.has(m.id);
+        cb.addEventListener('change', () => { cb.checked ? mpSelected.add(m.id) : mpSelected.delete(m.id); });
+        left.appendChild(cb);
+        const info = el('div');
+        info.appendChild(el('div', {text: mealTitle(m)}));
+        const noteBits = [m.servings ? m.servings + ' servings' : null, m.notes].filter(Boolean).join(' · ');
+        if(noteBits) info.appendChild(el('div', {class:'mm-note', text: noteBits}));
+        left.appendChild(info);
+        meal.appendChild(left);
+        const rm = el('button', {class:'icon-btn', type:'button', text:'✕', title:'Remove meal', style:'color:var(--text-dim);'});
+        rm.addEventListener('click', async () => {
+          const { error } = await safeDb(supabase.from('meal_plan_items').delete().eq('id', m.id), 'Could not remove the meal');
+          if(error) return;
+          mpItems = mpItems.filter(x => x.id !== m.id);
+          renderMealPlan();
+        });
+        meal.appendChild(rm);
+        body.appendChild(meal);
+      });
+      const addBtn = el('button', {class:'btn ghost small', type:'button', text:'+ Add', style:'padding:3px 9px; font-size:11px; margin-top:2px;'});
+      addBtn.addEventListener('click', () => openMealModal(dayStr, slot));
+      body.appendChild(addBtn);
+      slotRow.appendChild(body);
+      card.appendChild(slotRow);
+    });
+    grid.appendChild(card);
+  }
+}
+
+document.getElementById('mpPrevWeek').addEventListener('click', () => { mpWeekStart.setDate(mpWeekStart.getDate() - 7); loadMealPlan(); });
+document.getElementById('mpNextWeek').addEventListener('click', () => { mpWeekStart.setDate(mpWeekStart.getDate() + 7); loadMealPlan(); });
+document.getElementById('mpThisWeek').addEventListener('click', () => { mpWeekStart = mondayOf(new Date()); loadMealPlan(); });
+
+let mealModalContext = null;
+async function openMealModal(dateStr, slot){
+  mealModalContext = { dateStr, slot };
+  document.getElementById('mealModalTitle').textContent = 'Add ' + slot;
+  document.getElementById('mealModalSub').textContent = new Date(dateStr + 'T00:00:00').toLocaleDateString('en-IE', {weekday:'long', day:'numeric', month:'long'});
+  const recipeSel = document.getElementById('mealRecipeSelect');
+  recipeSel.innerHTML = '';
+  recipeSel.appendChild(el('option', {value:'', text:'— none —'}));
+  const { data: recipes } = await safeDb(supabase.from('recipes').select('id,title,is_favourite,servings').eq('household_id', household.id).order('is_favourite', {ascending:false}).order('generated_at', {ascending:false}).limit(40), 'Could not load recipes');
+  (recipes||[]).forEach(r => recipeSel.appendChild(el('option', {value:r.id, text:(r.is_favourite ? '★ ' : '') + r.title})));
+  const loSel = document.getElementById('mealLeftoverSelect');
+  loSel.innerHTML = '';
+  loSel.appendChild(el('option', {value:'', text:'— none —'}));
+  const { data: los } = await safeDb(supabase.from('leftovers').select('*').eq('household_id', household.id).is('consumed_at', null).order('created_at', {ascending:false}).limit(20), 'Could not load leftovers');
+  (los||[]).forEach(l => loSel.appendChild(el('option', {value:l.id, text:(l.recipe_title||'Leftovers') + ' — ' + l.amount})));
+  document.getElementById('mealManualInput').value = '';
+  document.getElementById('mealServings').value = state.servings;
+  document.getElementById('mealCookTwice').checked = false;
+  document.getElementById('mealNotes').value = '';
+  document.getElementById('mealModal').classList.remove('hidden');
+}
+document.getElementById('mealCancelBtn').addEventListener('click', () => document.getElementById('mealModal').classList.add('hidden'));
+document.getElementById('mealSaveBtn').addEventListener('click', async () => {
+  if(!mealModalContext) return;
+  const plan = await ensurePlanRow();
+  if(!plan) return;
+  const recipeId = document.getElementById('mealRecipeSelect').value || null;
+  const manual = document.getElementById('mealManualInput').value.trim() || null;
+  const leftoverSel = document.getElementById('mealLeftoverSelect');
+  const leftoverId = leftoverSel.value || null;
+  const leftoverTitle = leftoverId ? leftoverSel.options[leftoverSel.selectedIndex].text : null;
+  if(!recipeId && !manual && !leftoverId){ showToast('Pick a recipe, type a meal, or choose leftovers', true); return; }
+  const servings = parseInt(document.getElementById('mealServings').value) || null;
+  const notes = document.getElementById('mealNotes').value.trim() || null;
+  const cookTwice = document.getElementById('mealCookTwice').checked;
+  const row = {
+    meal_plan_id: plan.id, household_id: household.id,
+    meal_date: mealModalContext.dateStr, meal_slot: mealModalContext.slot,
+    recipe_id: recipeId, manual_title: manual || (leftoverId ? leftoverTitle : null),
+    servings, notes, use_leftovers: !!leftoverId, leftover_id: leftoverId
+  };
+  const { data, error } = await safeDb(supabase.from('meal_plan_items').insert(row).select('*, recipes(id,title,servings,ingredients)').single(), 'Could not add the meal');
+  if(error) return;
+  mpItems.push(data);
+  if(cookTwice){
+    const nextDay = new Date(mealModalContext.dateStr + 'T00:00:00'); nextDay.setDate(nextDay.getDate() + 1);
+    const nextDayStr = isoDate(nextDay);
+    // The follow-up meal may fall in next week's plan
+    let plan2 = plan;
+    if(nextDayStr > isoDate(new Date(new Date(mpWeekStart).setDate(mpWeekStart.getDate() + 6)))){
+      const { data: p2 } = await safeDb(supabase.from('meal_plans').upsert({ household_id: household.id, week_start: isoDate(mondayOf(nextDay)) }, { onConflict:'household_id,week_start' }).select().single(), 'Could not create next week\'s plan');
+      if(p2) plan2 = p2;
+    }
+    const { data: second } = await safeDb(supabase.from('meal_plan_items').insert({
+      meal_plan_id: plan2.id, household_id: household.id,
+      meal_date: nextDayStr, meal_slot: mealModalContext.slot,
+      recipe_id: recipeId, manual_title: manual, servings,
+      use_leftovers: true, notes: 'Cook once, eat twice — leftovers from the day before'
+    }).select('*, recipes(id,title,servings,ingredients)').single(), 'Could not add the leftover meal');
+    if(second && second.meal_date >= isoDate(mpWeekStart)) mpItems.push(second);
+  }
+  document.getElementById('mealModal').classList.add('hidden');
+  renderMealPlan();
+});
+
+// Aggregate ingredients from planned meals (scaled by servings), subtract pantry, persist as a list.
+async function createListFromMeals(items, title){
+  const cookMeals = items.filter(m => !m.use_leftovers); // leftover meals don't need shopping
+  const withRecipes = cookMeals.filter(m => m.recipes?.ingredients?.length);
+  if(!withRecipes.length){ showToast('No recipe-backed meals there to shop for', true); return; }
+  const aggregated = {};
+  withRecipes.forEach(m => {
+    const scale = (m.servings && m.recipes.servings) ? m.servings / m.recipes.servings : 1;
+    (m.recipes.ingredients||[]).forEach(ing => {
+      const amt = parseFloat(ing.amount);
+      const key = normalizeIngredientName(ing.item) + '|' + (ing.unit||'').toLowerCase();
+      if(aggregated[key] && !isNaN(amt)){
+        aggregated[key].amount = (parseFloat(aggregated[key].amount)||0) + amt * scale;
+      } else if(!aggregated[key]){
+        aggregated[key] = { ...ing, amount: isNaN(amt) ? ing.amount : amt * scale, recipeId: m.recipe_id };
+      }
+    });
+  });
+  const list = await ensureDraftList(title, 'meal_plan');
+  if(!list) return;
+  const listItems = Object.values(aggregated).map(ing => {
+    const rounded = typeof ing.amount === 'number' ? Number(ing.amount.toFixed(2)) : ing.amount;
+    return ingredientToListItem({ ...ing, amount: rounded }, ing.recipeId);
+  });
+  const ok = await addItemsToList(list, listItems);
+  if(!ok) return;
+  const skipped = cookMeals.length - withRecipes.length;
+  showToast('Added ' + listItems.length + ' item(s) to "' + list.title + '"' + (skipped ? ` (${skipped} manual meal(s) skipped — no ingredient data)` : ''));
+  openShoppingTab(list.id);
+}
+document.getElementById('mpListWeekBtn').addEventListener('click', () => createListFromMeals(mpItems, 'Meal plan — week of ' + mpWeekStart.toLocaleDateString('en-IE', {day:'numeric', month:'short'})));
+document.getElementById('mpListSelectedBtn').addEventListener('click', () => {
+  const selected = mpItems.filter(m => mpSelected.has(m.id));
+  if(!selected.length){ showToast('Tick some meals first', true); return; }
+  createListFromMeals(selected, 'Selected meals');
+});
+
+// ---------------- EXPIRY REMINDERS (in-app; notifications only fire while the app is open) ----------------
+function expiryBuckets(){
+  const todayStr = isoDate(new Date(new Date().setHours(0,0,0,0)));
+  const groups = { expired:[], today:[], tomorrow:[], three:[], seven:[] };
+  pantryItems.forEach(item => {
+    if(!item.expiry_date || Number(item.quantity) <= 0) return;
+    if(item.reminder_snooze_until && item.reminder_snooze_until > todayStr) return;
+    const d = daysUntil(item.expiry_date);
+    if(d === null || d > 7) return;
+    if(d < 0) groups.expired.push(item);
+    else if(d === 0) groups.today.push(item);
+    else if(d === 1) groups.tomorrow.push(item);
+    else if(d <= 3) groups.three.push(item);
+    else groups.seven.push(item);
+  });
+  return groups;
+}
+
+function renderExpiringPanel(){
+  const panel = document.getElementById('expiringPanel');
+  const body = document.getElementById('expiringBody');
+  const groups = expiryBuckets();
+  const total = Object.values(groups).reduce((n, g) => n + g.length, 0);
+  if(!total){ panel.classList.add('hidden'); return; }
+  panel.classList.remove('hidden');
+  body.innerHTML = '';
+  const labels = [['expired','Already expired'],['today','Expires today'],['tomorrow','Expires tomorrow'],['three','Within 3 days'],['seven','Within 7 days']];
+  labels.forEach(([key, label]) => {
+    const items = groups[key];
+    if(!items.length) return;
+    body.appendChild(el('div', {class:'exp-group-label' + (key === 'three' || key === 'seven' ? ' later' : ''), text: label}));
+    items.forEach(item => {
+      const row = el('div', {class:'exp-item'});
+      row.appendChild(el('span', {text: `${item.name} — ${item.quantity}${item.unit ? ' ' + item.unit : ''} (use by ${item.expiry_date})`}));
+      const btns = el('div', {class:'row', style:'gap:6px;'});
+      const useBtn = el('button', {class:'btn ghost small', type:'button', text:'Use in recipe'});
+      useBtn.addEventListener('click', () => {
+        if(!state.onHand.includes(item.name)) state.onHand.push(item.name);
+        renderOnHand();
+        switchToTab('recipes');
+        showToast('"' + item.name + '" added to ingredients on hand');
+      });
+      const eatBtn = el('button', {class:'btn ghost small', type:'button', text:'Mark consumed'});
+      eatBtn.addEventListener('click', async () => {
+        const { error } = await safeDb(supabase.from('pantry_items').update({ quantity: 0, updated_at: new Date().toISOString() }).eq('id', item.id), 'Could not mark it consumed');
+        if(error) return;
+        item.quantity = 0;
+        renderPantryList(); renderShoppingNeeded(); renderExpiringPanel();
+      });
+      const snoozeBtn = el('button', {class:'btn ghost small', type:'button', text:'Snooze 3d'});
+      snoozeBtn.addEventListener('click', async () => {
+        const until = new Date(); until.setDate(until.getDate() + 3);
+        const untilStr = isoDate(until);
+        const { error } = await safeDb(supabase.from('pantry_items').update({ reminder_snooze_until: untilStr }).eq('id', item.id), 'Could not snooze the reminder');
+        if(error) return;
+        item.reminder_snooze_until = untilStr;
+        renderExpiringPanel();
+      });
+      btns.appendChild(useBtn); btns.appendChild(eatBtn); btns.appendChild(snoozeBtn);
+      row.appendChild(btns);
+      body.appendChild(row);
+    });
+  });
+}
+
+function updateRemindersStatus(){
+  const btn = document.getElementById('enableRemindersBtn');
+  const status = document.getElementById('remindersStatus');
+  if(!('Notification' in window)){
+    btn.classList.add('hidden');
+    status.textContent = 'Browser notifications are not supported here — reminders show in this panel instead.';
+    return;
+  }
+  if(Notification.permission === 'granted' && localStorage.getItem('kvj_reminders') === 'on'){
+    btn.classList.add('hidden');
+    status.textContent = 'Reminders on: you\'ll get a notification about expiring items when you open the app. (Not a background push — nothing fires while the app is closed.)';
+  } else if(Notification.permission === 'denied'){
+    btn.classList.add('hidden');
+    status.textContent = 'Notifications are blocked in your browser settings — reminders show in this panel instead.';
+  } else {
+    btn.classList.remove('hidden');
+    status.textContent = '';
+  }
+}
+document.getElementById('enableRemindersBtn').addEventListener('click', async () => {
+  if(!('Notification' in window)) return;
+  const perm = await Notification.requestPermission();
+  if(perm === 'granted'){ localStorage.setItem('kvj_reminders', 'on'); showToast('Expiry reminders enabled'); maybeShowExpiryNotification(true); }
+  updateRemindersStatus();
+});
+async function maybeShowExpiryNotification(force){
+  if(!('Notification' in window) || Notification.permission !== 'granted' || localStorage.getItem('kvj_reminders') !== 'on') return;
+  const todayStr = isoDate(new Date(new Date().setHours(0,0,0,0)));
+  if(!force && localStorage.getItem('kvj_last_expiry_notif') === todayStr) return; // once a day is plenty
+  const groups = expiryBuckets();
+  const urgent = [...groups.expired, ...groups.today, ...groups.tomorrow];
+  if(!urgent.length) return;
+  localStorage.setItem('kvj_last_expiry_notif', todayStr);
+  const bodyText = urgent.slice(0,5).map(i => i.name + ' (' + i.expiry_date + ')').join(', ') + (urgent.length > 5 ? ` and ${urgent.length-5} more` : '');
+  try {
+    const reg = 'serviceWorker' in navigator ? await navigator.serviceWorker.getRegistration() : null;
+    if(reg && reg.showNotification) reg.showNotification('Kook vir Jou — use these soon', { body: bodyText, icon: 'icons/icon-192.png', badge: 'icons/icon-192.png' });
+    else new Notification('Kook vir Jou — use these soon', { body: bodyText, icon: 'icons/icon-192.png' });
+  } catch(e){ console.error('Could not show the expiry notification', e); }
+}
+
+// ---------------- BARCODE + OPEN FOOD FACTS ----------------
+let barcodeStream = null, barcodeDetectLoop = null;
+
+document.getElementById('barcodeLookupBtn').addEventListener('click', () => {
+  const code = document.getElementById('barcodeManualInput').value.trim().replace(/\s+/g,'');
+  if(!code){ document.getElementById('barcodeStatus').textContent = 'Type or scan a barcode first.'; return; }
+  lookupBarcode(code);
+});
+document.getElementById('barcodeManualInput').addEventListener('keydown', e => {
+  if(e.key === 'Enter'){ e.preventDefault(); document.getElementById('barcodeLookupBtn').click(); }
+});
+
+document.getElementById('barcodeScanBtn').addEventListener('click', async () => {
+  const status = document.getElementById('barcodeStatus');
+  if(!('BarcodeDetector' in window)){
+    status.textContent = 'This browser has no built-in barcode detector (works in Chrome/Edge on Android and desktop). Type the barcode instead — the number under the bars.';
+    document.getElementById('barcodeManualInput').focus();
+    return;
+  }
+  try {
+    const detector = new BarcodeDetector({ formats: ['ean_13','ean_8','upc_a','upc_e','code_128'] });
+    barcodeStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode:'environment' } });
+    const video = document.getElementById('barcodeVideo');
+    video.srcObject = barcodeStream;
+    document.getElementById('barcodeVideoWrap').classList.remove('hidden');
+    status.textContent = 'Point the camera at the barcode…';
+    barcodeDetectLoop = setInterval(async () => {
+      try {
+        const codes = await detector.detect(video);
+        if(codes.length){
+          const code = codes[0].rawValue;
+          stopBarcodeCamera();
+          document.getElementById('barcodeManualInput').value = code;
+          lookupBarcode(code);
+        }
+      } catch(e){ /* frame not ready yet */ }
+    }, 350);
+  } catch(e){
+    status.textContent = 'Camera not available (' + e.message + '). Type the barcode instead.';
+  }
+});
+function stopBarcodeCamera(){
+  clearInterval(barcodeDetectLoop); barcodeDetectLoop = null;
+  if(barcodeStream){ barcodeStream.getTracks().forEach(t => t.stop()); barcodeStream = null; }
+  document.getElementById('barcodeVideoWrap').classList.add('hidden');
+}
+document.getElementById('barcodeStopBtn').addEventListener('click', stopBarcodeCamera);
+
+async function lookupBarcode(code){
+  const status = document.getElementById('barcodeStatus');
+  const resultWrap = document.getElementById('barcodeResult');
+  resultWrap.innerHTML = '';
+  status.textContent = 'Looking up ' + code + ' on Open Food Facts…';
+  let product = null;
+  try {
+    const resp = await fetch(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json?fields=product_name,brands,quantity,ingredients_text,allergens_tags,nutriments,code`);
+    const data = await resp.json();
+    if(data.status === 1 && data.product) product = data.product;
+  } catch(e){
+    status.textContent = 'Open Food Facts request failed (' + e.message + ') — you can still add the item manually below.';
+    resultWrap.appendChild(buildBarcodeConfirmCard(code, null));
+    return;
+  }
+  if(!product){
+    status.textContent = 'Product ' + code + ' not found on Open Food Facts. Fill it in manually — the barcode will still be saved with the item.';
+    resultWrap.appendChild(buildBarcodeConfirmCard(code, null));
+    return;
+  }
+  status.textContent = 'Found it — check the details, edit anything, then confirm:';
+  resultWrap.appendChild(buildBarcodeConfirmCard(code, product));
+}
+
+function buildBarcodeConfirmCard(code, product){
+  const card = el('div', {class:'panel', style:'padding:14px 16px;'});
+  const name = product ? [product.product_name, product.brands ? '(' + product.brands.split(',')[0].trim() + ')' : ''].filter(Boolean).join(' ') : '';
+  card.appendChild(el('div', {style:'font-weight:600;', text: product ? (product.product_name || 'Unnamed product') : 'Manual entry for barcode ' + code}));
+  if(product) card.appendChild(el('div', {class:'source-note', text:'Product data from Open Food Facts (community database) — not an AI guess. Check the physical label for allergens.'}));
+
+  // parse "500 g" / "1 l" style package size
+  let qtyGuess = '', unitGuess = '';
+  if(product?.quantity){
+    const m = product.quantity.match(/([\d.,]+)\s*([a-zA-Z]+)/);
+    if(m){ qtyGuess = m[1].replace(',', '.'); unitGuess = m[2].toLowerCase(); }
+  }
+
+  const row1 = el('div', {class:'row', style:'margin-top:10px;'});
+  const nameInput = el('input', {type:'text', placeholder:'Item name', style:'flex:2; min-width:160px;'});
+  nameInput.value = product ? (product.product_name || '') : '';
+  const qtyInput = el('input', {type:'number', step:'0.1', placeholder:'qty', style:'width:80px;'});
+  qtyInput.value = qtyGuess;
+  const unitInput = el('input', {type:'text', placeholder:'unit', style:'width:70px;'});
+  unitInput.value = unitGuess;
+  const expInput = el('input', {type:'text', placeholder:'expiry yyyy-mm-dd', style:'width:150px;'});
+  row1.appendChild(nameInput); row1.appendChild(qtyInput); row1.appendChild(unitInput); row1.appendChild(expInput);
+  card.appendChild(row1);
+  const trackLabel = el('label', {style:'font-size:12.5px; display:flex; align-items:center; gap:6px; margin-top:8px;'});
+  const trackCb = el('input', {type:'checkbox'});
+  trackLabel.appendChild(trackCb);
+  trackLabel.appendChild(document.createTextNode(' track use in recipes'));
+  card.appendChild(trackLabel);
+
+  if(product){
+    const facts = el('div', {class:'hint', style:'margin-top:10px;'});
+    if(product.brands) facts.appendChild(el('div', {text:'Brand: ' + product.brands}));
+    if(product.quantity) facts.appendChild(el('div', {text:'Package size: ' + product.quantity}));
+    if(product.ingredients_text) facts.appendChild(el('div', {text:'Ingredients (label): ' + product.ingredients_text}));
+    const allergens = (product.allergens_tags||[]).map(t => t.replace(/^[a-z]{2}:/,'').replace(/-/g,' '));
+    if(allergens.length) facts.appendChild(el('div', {style:'color:var(--warn);', text:'Allergens on record: ' + allergens.join(', ') + ' (from Open Food Facts — still check the label)'}));
+    const n = product.nutriments || {};
+    const nutBits = [];
+    if(n['energy-kcal_100g'] != null) nutBits.push(Math.round(n['energy-kcal_100g']) + ' kcal');
+    if(n.proteins_100g != null) nutBits.push(n.proteins_100g + 'g protein');
+    if(n.carbohydrates_100g != null) nutBits.push(n.carbohydrates_100g + 'g carbs');
+    if(n.fat_100g != null) nutBits.push(n.fat_100g + 'g fat');
+    if(n.salt_100g != null) nutBits.push(n.salt_100g + 'g salt');
+    if(nutBits.length) facts.appendChild(el('div', {text:'Per 100g (Open Food Facts): ' + nutBits.join(' · ')}));
+    card.appendChild(facts);
+  }
+
+  const saveBtn = el('button', {class:'btn small', type:'button', text:'Add to pantry', style:'margin-top:12px;'});
+  saveBtn.addEventListener('click', async () => {
+    const itemName = nameInput.value.trim();
+    if(!itemName){ nameInput.focus(); nameInput.style.borderColor = 'var(--warn)'; return; }
+    const quantity = parseFloat(qtyInput.value) || 0;
+    const n = product?.nutriments || {};
+    const nutrition = {};
+    ['energy-kcal_100g','proteins_100g','carbohydrates_100g','fat_100g','salt_100g','sugars_100g','fiber_100g'].forEach(k => { if(n[k] != null) nutrition[k] = n[k]; });
+    const allergens = (product?.allergens_tags||[]).map(t => t.replace(/^[a-z]{2}:/,'').replace(/-/g,' ')).join(', ');
+    const { data, error } = await safeDb(supabase.from('pantry_items').insert({
+      household_id: household.id, name: itemName, quantity,
+      unit: unitInput.value.trim() || null, expiry_date: expInput.value.trim() || null,
+      track_consumption: trackCb.checked, source:'barcode',
+      barcode: code, brand: product?.brands || null,
+      product_data: product ? { code: product.code, product_name: product.product_name, brands: product.brands, quantity: product.quantity } : null,
+      nutrition_per_100g: Object.keys(nutrition).length ? nutrition : null,
+      ingredients_text: product?.ingredients_text || null,
+      allergen_text: allergens || null
+    }).select().single(), 'Could not save the item');
+    if(error) return;
+    if(data){ pantryItems.push(data); renderPantryList(); renderShoppingNeeded(); renderExpiringPanel(); }
+    showToast('"' + itemName + '" added to Koskas');
+    card.remove();
+    document.getElementById('barcodeStatus').textContent = '';
+    document.getElementById('barcodeManualInput').value = '';
+  });
+  card.appendChild(saveBtn);
+  return card;
+}
+
+// ---------------- PWA SERVICE WORKER ----------------
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(e => console.error('Service worker registration failed', e));
+  });
+}
 
 renderOnHand();
 </script>
