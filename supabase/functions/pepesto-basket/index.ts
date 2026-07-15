@@ -4,12 +4,15 @@ import {
   buildPepestoInput,
   isRetailerDomain,
   normalisePepestoResponse,
+  retailerDisplayName,
+  validateRedirectUrl,
   type ShoppingItem,
 } from "./helpers.ts";
 
 const ALLOWED_ORIGINS = ["https://kookvirjou.com", "https://www.kookvirjou.com"];
 const MAX_BODY_BYTES = 2048;
 const PEPESTO_ENDPOINT = "https://s.pepesto.com/api/products";
+const PEPESTO_ONESHOT_ENDPOINT = "https://s.pepesto.com/api/oneshot";
 // Some retailer caches respond more slowly than others. Keep one billable call,
 // but allow enough time for the slower Irish retailer response to complete.
 const REQUEST_TIMEOUT_MS = 45_000;
@@ -62,6 +65,23 @@ export async function callPepesto(apiKey: string, contentText: string, retailerD
   }
 }
 
+export async function callPepestoOneshot(apiKey: string, contentText: string, retailerDomain: string) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch(PEPESTO_ONESHOT_ENDPOINT, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ content_text: contentText, supermarket_domain: retailerDomain }),
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error(cleanError(response.status));
+    return await response.json() as Record<string, unknown>;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders(req) });
   if (req.method !== "POST") return json(req, { error: "Method not allowed." }, 405);
@@ -78,7 +98,7 @@ Deno.serve(async (req: Request) => {
 
     const { shoppingListId, retailerDomain, mode } = body;
     if (typeof shoppingListId !== "string" || !/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(shoppingListId) ||
-      !isRetailerDomain(retailerDomain) || mode !== "compare") {
+      !isRetailerDomain(retailerDomain) || (mode !== "compare" && mode !== "checkout")) {
       return json(req, { error: "Invalid shopping list, retailer, or mode." }, 400);
     }
 
@@ -108,6 +128,16 @@ Deno.serve(async (req: Request) => {
 
     const apiKey = Deno.env.get("PEPESTO_API_KEY");
     if (!apiKey) return json(req, { error: "Pepesto is not configured on this project." }, 503);
+    if (mode === "checkout") {
+      const upstream = await callPepestoOneshot(apiKey, contentText, retailerDomain);
+      const redirectUrl = validateRedirectUrl(upstream.redirect_url);
+      if (!redirectUrl) return json(req, { error: "Pepesto did not return a safe basket-review link." }, 502);
+      return json(req, {
+        retailer: { name: retailerDisplayName(retailerDomain), domain: retailerDomain },
+        redirectUrl,
+        requestedAt: new Date().toISOString(),
+      });
+    }
     const upstream = await callPepesto(apiKey, contentText, retailerDomain);
     return json(req, normalisePepestoResponse(upstream, retailerDomain));
   } catch (error) {
