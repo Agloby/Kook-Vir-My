@@ -3,7 +3,7 @@ export const PEPESTO_RETAILERS = [
   { domain: 'dunnesstoresgrocery.com', name: 'Dunnes Stores Grocery' },
   { domain: 'shop.supervalu.ie', name: 'SuperValu Ireland' }
 ];
-export const PEPESTO_ESTIMATED_PRICES_EUR = { products: 0.04 };
+export const PEPESTO_ESTIMATED_PRICES_EUR = { products: 0.04, oneshot: 0.32 };
 
 export function rankComparisonResults(results) {
   return [...results].sort((a, b) => {

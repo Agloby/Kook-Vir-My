@@ -652,7 +652,7 @@ let lastDeduction = [];
 let shoppingLists = [], currentList = null, currentListItems = [];
 const pepestoResultsByList = new Map();
 const pepestoRequestGate = createRequestGate();
-document.getElementById('pepestoCostEstimate').textContent = `Estimated Pepesto API cost: €${(PEPESTO_RETAILERS.length * PEPESTO_ESTIMATED_PRICES_EUR.products).toFixed(2)} for three €${PEPESTO_ESTIMATED_PRICES_EUR.products.toFixed(2)} product-match requests.`;
+document.getElementById('pepestoCostEstimate').textContent = `Estimated comparison cost: €${(PEPESTO_RETAILERS.length * PEPESTO_ESTIMATED_PRICES_EUR.products).toFixed(2)}. Creating one retailer basket costs approximately €${PEPESTO_ESTIMATED_PRICES_EUR.oneshot.toFixed(2)} extra.`;
 let mpWeekStart = null, mpPlan = null, mpItems = [], mpSelected = new Set();
 let recipeTagsCache = {}; // recipe_id -> Set of this user's tags
 const state = {
@@ -2411,6 +2411,28 @@ function buildPepestoReview(result){
   return details;
 }
 
+async function createPepestoBasket(result, button){
+  if(!currentList || button.disabled) return;
+  button.disabled = true;
+  const originalText = button.textContent;
+  button.textContent = 'Creating basket…';
+  try {
+    const { data, error } = await supabase.functions.invoke('pepesto-basket', {body:{
+      shoppingListId:currentList.id, retailerDomain:result.retailer.domain, mode:'checkout'
+    }});
+    if(error) throw new Error(await pepestoInvokeErrorMessage(error));
+    if(!data || data.error) throw new Error(data?.error || 'Basket creation failed');
+    const redirectUrl = validHandoffUrl(data.redirectUrl);
+    if(!redirectUrl) throw new Error('Pepesto did not return a safe basket-review link.');
+    result.redirectUrl = redirectUrl;
+    renderPepestoResults(pepestoResultsByList.get(currentList.id) || []);
+  } catch(error) {
+    button.disabled = false;
+    button.textContent = originalText;
+    showToast(error.message || 'Basket creation failed', true);
+  }
+}
+
 function renderPepestoResults(results){
   const wrap = document.getElementById('pepestoResults');
   wrap.innerHTML = '';
@@ -2449,6 +2471,11 @@ function renderPepestoResults(results){
     const redirectUrl = validHandoffUrl(result.redirectUrl);
     if(redirectUrl){
       card.appendChild(el('a', {class:'btn small', href:redirectUrl, target:'_blank', rel:'noopener noreferrer', style:'display:inline-block; text-decoration:none; margin-top:10px;', text:'Review basket at ' + result.retailer.name}));
+    } else {
+      const createBasket = el('button', {class:'btn small', type:'button', style:'margin-top:10px;', text:'Create basket at ' + result.retailer.name});
+      createBasket.addEventListener('click', () => createPepestoBasket(result, createBasket));
+      card.appendChild(createBasket);
+      card.appendChild(el('div', {class:'hint', text:'Uses one €0.32 Pepesto /oneshot request. You review the basket before retailer login and payment.'}));
     }
     wrap.appendChild(card);
   });
