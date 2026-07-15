@@ -175,6 +175,8 @@
   .qf-chip:hover{border-color:var(--saffron-dim);}
   .qf-chip.on{background:var(--saffron); border-color:var(--saffron); color:#1F2421; font-weight:600;}
 
+  .sl-category-label{font-family:'IBM Plex Mono', monospace; font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--saffron); margin:14px 0 6px; border-top:1px solid var(--line); padding-top:10px;}
+  .sl-category-label:first-child{border-top:none; margin-top:0; padding-top:0;}
   #barcodeVideoWrap{position:relative; max-width:420px;}
   #barcodeVideo{width:100%; border-radius:8px; border:1px solid var(--line);}
   .source-note{font-size:11px; color:var(--text-dim); font-family:'IBM Plex Mono',monospace;}
@@ -1049,6 +1051,33 @@ function scanForAllergens(recipe, allergyList){
   return hits;
 }
 
+// ---------------- SHOPPING LIST CATEGORIES (aisle-style grouping) ----------------
+// Best-effort keyword grouping so a list reads the way a shop is laid out (produce
+// together, meat/fish together, etc.) rather than in whatever order ingredients were
+// listed. Order here also sets display/export order.
+const CATEGORY_ORDER = ['Fruit & Veg', 'Meat & Fish', 'Dairy & Eggs', 'Bakery', 'Pantry & Dry Goods', 'Tins & Jars', 'Frozen', 'Drinks', 'Household & Other'];
+const CATEGORY_KEYWORDS = {
+  'Fruit & Veg': ['onion','garlic','tomato','potato','carrot','pepper','courgette','aubergine','cucumber','lettuce','spinach','kale','broccoli','cauliflower','mushroom','apple','banana','lemon','lime','orange','avocado','ginger','chilli','chili','herb','parsley','coriander','basil','mint','rocket','celery','leek','sweetcorn','scallion','spring onion'],
+  'Meat & Fish': ['chicken','beef','pork','lamb','mince','minced beef','bacon','sausage','turkey','salmon','tuna','cod','prawn','shrimp','fish','anchovy','trout','mackerel','sardine','haddock','ham','chorizo','steak'],
+  'Dairy & Eggs': ['milk','cheese','butter','cream','yogurt','yoghurt','egg','parmesan','mozzarella','feta','cheddar','crème fraîche','mascarpone'],
+  'Bakery': ['bread','baguette','roll','bun','tortilla','wrap','pitta','naan','bagel'],
+  'Frozen': ['frozen','ice cream','peas'],
+  'Tins & Jars': ['tinned','canned','tin of','jar of','passata','tomato puree','tomato paste','chickpea','kidney bean','baked beans'],
+  'Drinks': ['wine','beer','juice','soda','water','coffee','tea'],
+  'Pantry & Dry Goods': ['flour','sugar','rice','pasta','spaghetti','penne','noodle','oil','olive oil','vinegar','stock','stock cube','herbs','spice','salt','pepper','pepper flakes','cumin','paprika','oregano','cinnamon','honey','soy sauce','yeast','baking powder','couscous','lentil','oat']
+};
+function categorizeIngredient(name){
+  const lower = (name||'').toLowerCase();
+  for(const cat of CATEGORY_ORDER){
+    const keywords = CATEGORY_KEYWORDS[cat];
+    if(keywords && keywords.some(k => lower.includes(k))) return cat;
+  }
+  return 'Household & Other';
+}
+function getItemCategory(item){
+  return item.category || categorizeIngredient(item.item_name);
+}
+
 // One shared pattern for every Supabase read/write that matters: awaits the query,
 // surfaces failures to the user (toast) and to the console, returns { data, error }.
 // Call sites should bail out (and revert any optimistic UI change) when error is set.
@@ -1191,6 +1220,7 @@ async function generateRecipes(){
     const prompt = buildPrompt(preferenceSummary);
     const parsed = await callClaudeForRecipes(prompt);
     const savedRecipes = await persistRecipes(parsed);
+    state.currentResults = savedRecipes;
     renderResults(savedRecipes, parsed.onHandAlternative);
   } catch(err){
     console.error(err);
@@ -1725,6 +1755,40 @@ function convertUnits(amount, fromUnit, toUnit){
   return from.qty / to.qty; // to.qty is the base-size of 1 target unit
 }
 
+// ---------------- SHOPPING LIST INGREDIENT MERGING ----------------
+// Recipes phrase the same shop item differently ("2 lemons", "zest of 1 lemon", "juice of 1
+// lemon") - a shopping list that keeps those as three separate lines is not a proper list.
+// These helpers fold matching lines together when items are added, whether they come from the
+// same batch or a separate recipe added later.
+const PLAIN_COUNT_UNITS = new Set(['', 'x', 'whole', 'each', 'piece', 'pieces', 'unit', 'units']);
+function mergeUnitKey(unit){
+  const u = (unit||'').toLowerCase().trim();
+  return PLAIN_COUNT_UNITS.has(u) ? '' : u; // fold plain-count wordings into one bucket
+}
+// Only strips prep phrasing for MATCHING (aggressive is fine here); display name is cleaned
+// separately and more conservatively so it stays readable.
+function baseIngredientKey(name){
+  let s = (name||'').toLowerCase().trim();
+  s = s.replace(/^(zest of|juice of|a handful of|a pinch of|a splash of|a drizzle of)\s+/, '');
+  s = s.replace(/,?\s*\b(zested|grated|peeled|chopped|sliced|crushed|minced|diced|juiced)\b\s*$/, '');
+  return normalizeIngredientName(s);
+}
+function cleanIngredientDisplayName(name){
+  let s = (name||'').trim();
+  s = s.replace(/^(zest of|juice of|a handful of|a pinch of|a splash of|a drizzle of)\s+/i, '');
+  s = s.replace(/\s*,?\s*\b(zested|grated|peeled|chopped|sliced|crushed|minced|diced|juiced)\b\s*$/i, '');
+  return s.trim() || name;
+}
+// Tries to combine two quantities into one real number; returns null when that isn't safe
+// (different, unconvertible units, or either side is a vague amount like "to taste").
+function mergeCompatibleQuantity(existingQty, existingUnit, newQty, newUnit){
+  if(existingQty == null || newQty == null) return null;
+  if(mergeUnitKey(existingUnit) === mergeUnitKey(newUnit)) return { quantity: Number((existingQty + newQty).toFixed(2)), unit: existingUnit || newUnit };
+  const converted = convertUnits(newQty, newUnit, existingUnit);
+  if(converted !== null) return { quantity: Number((existingQty + converted).toFixed(2)), unit: existingUnit };
+  return null;
+}
+
 // ---------------- MARK AS COOKED: reviewed pantry deduction + leftover prompt ----------------
 function computePantryDeductions(recipe){
   const proposals = [];
@@ -2056,20 +2120,64 @@ async function ensureDraftList(title, source){
   return data;
 }
 
+// Adds items to a list, merging any that match an ingredient already on the list (whether
+// already-persisted from an earlier add, or another item in this same batch) instead of
+// creating a duplicate line - see baseIngredientKey/mergeCompatibleQuantity above.
 async function addItemsToList(list, items){
   if(!items.length) return true;
-  const { count } = await supabase.from('shopping_list_items').select('*', { count:'exact', head:true }).eq('shopping_list_id', list.id);
-  const base = count || 0;
-  const rows = items.map((it, i) => ({
-    shopping_list_id: list.id, household_id: household.id,
-    item_name: it.item_name, quantity: it.quantity ?? null, unit: it.unit ?? null,
-    quantity_text: it.quantity_text ?? null, category: it.category ?? null, notes: it.notes ?? null,
-    status: it.status || 'required', source: it.source || 'manual',
-    recipe_id: it.recipe_id ?? null, pantry_item_id: it.pantry_item_id ?? null,
-    sort_order: base + i
-  }));
-  const { error } = await safeDb(supabase.from('shopping_list_items').insert(rows), 'Could not add items to the list');
-  return !error;
+  const { data: existingRows, error: fetchErr } = await safeDb(supabase.from('shopping_list_items').select('*').eq('shopping_list_id', list.id), 'Could not read the list before adding items');
+  if(fetchErr) return false;
+  const existing = existingRows || [];
+  const byKey = new Map();
+  existing.forEach(row => {
+    if(row.status === 'bought') return; // once bought, don't silently fold new demand back into that line
+    byKey.set(baseIngredientKey(row.item_name) + '|' + mergeUnitKey(row.unit), row);
+  });
+
+  const toInsert = [];
+  const toUpdate = [];
+  let nextSort = existing.length;
+
+  for(const it of items){
+    const key = baseIngredientKey(it.item_name) + '|' + mergeUnitKey(it.unit);
+    const match = byKey.get(key);
+    if(match){
+      const merged = mergeCompatibleQuantity(match.quantity, match.unit, it.quantity, it.unit);
+      if(merged){
+        match.quantity = merged.quantity; match.unit = merged.unit;
+        match.quantity_text = `${merged.quantity}${merged.unit ? ' ' + merged.unit : ''}`;
+      } else {
+        // Can't combine into one number (e.g. "zest of 1" + "juice of 1") - keep it to one
+        // line anyway and say so honestly, rather than inventing a precise total.
+        const combined = [match.quantity_text, it.quantity_text].filter(Boolean).join(' + ');
+        match.quantity = null; match.unit = null;
+        match.quantity_text = combined ? combined + ' (combined from multiple recipes)' : match.quantity_text;
+      }
+      if(match.pantry_item_id == null && it.pantry_item_id != null) match.pantry_item_id = it.pantry_item_id;
+      if(match.id) toUpdate.push({ id: match.id, quantity: match.quantity, unit: match.unit, quantity_text: match.quantity_text, pantry_item_id: match.pantry_item_id });
+      continue;
+    }
+    const row = {
+      shopping_list_id: list.id, household_id: household.id,
+      item_name: cleanIngredientDisplayName(it.item_name), quantity: it.quantity ?? null, unit: it.unit ?? null,
+      quantity_text: it.quantity_text ?? null, category: it.category ?? null, notes: it.notes ?? null,
+      status: it.status || 'required', source: it.source || 'manual',
+      recipe_id: it.recipe_id ?? null, pantry_item_id: it.pantry_item_id ?? null,
+      sort_order: nextSort++
+    };
+    toInsert.push(row);
+    byKey.set(key, row); // later items in this same batch can still merge into it before it's inserted
+  }
+
+  for(const u of toUpdate){
+    const { error } = await safeDb(supabase.from('shopping_list_items').update({ quantity: u.quantity, unit: u.unit, quantity_text: u.quantity_text, pantry_item_id: u.pantry_item_id }).eq('id', u.id), 'Could not update a merged item');
+    if(error) return false;
+  }
+  if(toInsert.length){
+    const { error } = await safeDb(supabase.from('shopping_list_items').insert(toInsert), 'Could not add items to the list');
+    if(error) return false;
+  }
+  return true;
 }
 
 // Pantry-aware conversion of recipe ingredients into shopping list items. Conservative:
@@ -2079,7 +2187,8 @@ function ingredientToListItem(ing, recipeId){
   const item = {
     item_name: ing.item || 'item',
     quantity_text: [ing.amount, ing.unit].filter(Boolean).join(' ') || null,
-    recipe_id: recipeId || null, source:'recipe', status:'required'
+    recipe_id: recipeId || null, source:'recipe', status:'required',
+    category: categorizeIngredient(ing.item)
   };
   const amt = parseFloat(ing.amount);
   if(!isNaN(amt)){ item.quantity = amt; item.unit = ing.unit || null; }
@@ -2104,9 +2213,26 @@ function ingredientToListItem(ing, recipeId){
   return item;
 }
 
+// Recipes already represented in a list (by recipe_id) - used to stop the same recipe's
+// ingredients being added twice when it's sent to the list from more than one place.
+async function recipeIdsAlreadyInList(listId, recipeIds){
+  const ids = [...new Set((recipeIds||[]).filter(Boolean))];
+  if(!ids.length) return new Set();
+  const { data } = await safeDb(supabase.from('shopping_list_items').select('recipe_id').eq('shopping_list_id', listId).in('recipe_id', ids), 'Could not check the list for existing items');
+  return new Set((data||[]).map(d => d.recipe_id));
+}
+
 async function addRecipeToShoppingList(r){
   const list = await ensureDraftList('Shopping for ' + (r.title || 'recipes'), 'recipe');
   if(!list) return;
+  if(r.id){
+    const already = await recipeIdsAlreadyInList(list.id, [r.id]);
+    if(already.has(r.id)){
+      showToast('"' + (r.title||'This recipe') + '" is already in "' + list.title + '"');
+      openShoppingTab(list.id);
+      return;
+    }
+  }
   const items = (r.ingredients||[]).map(ing => ingredientToListItem(ing, r.id || null));
   const ok = await addItemsToList(list, items);
   if(!ok) return;
@@ -2203,7 +2329,20 @@ function renderListItems(){
     wrap.appendChild(el('div', {class:'hint', text:'No items yet — add some below, or send a recipe here with "Add to shopping list".'}));
     return;
   }
-  currentListItems.forEach(item => wrap.appendChild(buildListItemRow(item)));
+  // Grouped the way you'd walk a shop (produce together, meat/fish together, etc.)
+  // rather than in whatever order ingredients happened to be added.
+  const byCategory = {};
+  currentListItems.forEach(item => {
+    const cat = getItemCategory(item);
+    (byCategory[cat] = byCategory[cat] || []).push(item);
+  });
+  const cats = [...CATEGORY_ORDER, ...Object.keys(byCategory).filter(c => !CATEGORY_ORDER.includes(c))];
+  cats.forEach(cat => {
+    const items = byCategory[cat];
+    if(!items || !items.length) return;
+    wrap.appendChild(el('div', {class:'sl-category-label', text: cat}));
+    items.forEach(item => wrap.appendChild(buildListItemRow(item)));
+  });
 }
 
 function buildListItemRow(item){
@@ -2291,25 +2430,46 @@ function buildListExportText(){
   const lines = ['🛒 ' + l.title + ' — Kook vir Jou'];
   lines.push('Fulfilment: ' + (FULFIL_LABELS[l.fulfilment_method] || l.fulfilment_method) + (l.retailer_name ? ' · Shop: ' + l.retailer_name : ''));
   lines.push('');
-  const groups = [
-    ['To buy', currentListItems.filter(i => i.status === 'required')],
-    ['Optional', currentListItems.filter(i => i.status === 'optional')],
-    ['Check the pantry first', currentListItems.filter(i => i.status === 'check_pantry')],
-    ['Already have', currentListItems.filter(i => i.status === 'already_have')],
-    ['Bought', currentListItems.filter(i => i.status === 'bought')]
-  ];
-  groups.forEach(([label, items]) => {
-    if(!items.length) return;
-    lines.push(label + ':');
-    items.forEach(i => {
-      let line = '• ' + i.item_name;
-      const q = i.quantity != null ? `${i.quantity}${i.unit ? ' ' + i.unit : ''}` : (i.quantity_text || '');
-      if(q) line += ' — ' + q;
-      if(i.notes) line += ' (' + i.notes + ')';
-      lines.push(line);
-    });
+
+  // Grouped the way you'd walk a shop (produce together, meat/fish together, etc.) rather
+  // than by to-do status - required/optional/check-pantry are all still things to pick up
+  // while you're in that aisle, so they're flagged inline instead of split into their own sections.
+  const toBuy = currentListItems.filter(i => i.status === 'required' || i.status === 'optional' || i.status === 'check_pantry');
+  const byCategory = {};
+  toBuy.forEach(i => { const cat = getItemCategory(i); (byCategory[cat] = byCategory[cat] || []).push(i); });
+  const formatLine = (i) => {
+    let line = '• ' + i.item_name;
+    const q = i.quantity != null ? `${i.quantity}${i.unit ? ' ' + i.unit : ''}` : (i.quantity_text || '');
+    if(q) line += ' — ' + q;
+    const flags = [];
+    if(i.status === 'optional') flags.push('optional');
+    if(i.status === 'check_pantry') flags.push('check pantry first');
+    if(i.notes) flags.push(i.notes);
+    if(flags.length) line += ' (' + flags.join('; ') + ')';
+    return line;
+  };
+  const cats = [...CATEGORY_ORDER, ...Object.keys(byCategory).filter(c => !CATEGORY_ORDER.includes(c))];
+  cats.forEach(cat => {
+    const items = byCategory[cat];
+    if(!items || !items.length) return;
+    lines.push(cat + ':');
+    items.forEach(i => lines.push(formatLine(i)));
     lines.push('');
   });
+
+  const alreadyHave = currentListItems.filter(i => i.status === 'already_have');
+  const bought = currentListItems.filter(i => i.status === 'bought');
+  if(alreadyHave.length){
+    lines.push('Already have:');
+    alreadyHave.forEach(i => lines.push('• ' + i.item_name + (i.notes ? ' (' + i.notes + ')' : '')));
+    lines.push('');
+  }
+  if(bought.length){
+    lines.push('Bought:');
+    bought.forEach(i => lines.push('• ' + i.item_name));
+    lines.push('');
+  }
+
   const avoid = [...(household.allergies||[]), ...(household.diets||[])];
   if(avoid.length){
     lines.push('⚠️ This household avoids: ' + avoid.join(', ') + '. Check every product label — especially for Coeliac / gluten-free safety. This list is not an allergen guarantee.');
@@ -2383,7 +2543,7 @@ async function loadMealPlan(){
   const { data: plan } = await safeDb(supabase.from('meal_plans').select('*').eq('household_id', household.id).eq('week_start', weekStr).maybeSingle(), 'Could not load the meal plan');
   mpPlan = plan || null;
   const { data: items, error } = await safeDb(supabase.from('meal_plan_items')
-    .select('*, recipes(id,title,servings,ingredients)')
+    .select('*, recipes(id,title,servings,ingredients,steps)')
     .eq('household_id', household.id)
     .gte('meal_date', weekStr).lte('meal_date', isoDate(weekEnd))
     .order('meal_date'), 'Could not load planned meals');
@@ -2441,6 +2601,11 @@ function renderMealPlan(){
         if(noteBits) info.appendChild(el('div', {class:'mm-note', text: noteBits}));
         left.appendChild(info);
         meal.appendChild(left);
+        if(m.recipes && m.recipes.steps && m.recipes.steps.length){
+          const cookBtn = el('button', {class:'btn ghost small', type:'button', text:'Cook now', style:'padding:3px 9px; font-size:11px;'});
+          cookBtn.addEventListener('click', () => startCooking(m.recipes));
+          meal.appendChild(cookBtn);
+        }
         const rm = el('button', {class:'icon-btn', type:'button', text:'✕', title:'Remove meal', style:'color:var(--text-dim);'});
         rm.addEventListener('click', async () => {
           const { error } = await safeDb(supabase.from('meal_plan_items').delete().eq('id', m.id), 'Could not remove the meal');
@@ -2474,7 +2639,22 @@ async function openMealModal(dateStr, slot){
   recipeSel.innerHTML = '';
   recipeSel.appendChild(el('option', {value:'', text:'— none —'}));
   const { data: recipes } = await safeDb(supabase.from('recipes').select('id,title,is_favourite,servings').eq('household_id', household.id).order('is_favourite', {ascending:false}).order('generated_at', {ascending:false}).limit(40), 'Could not load recipes');
-  (recipes||[]).forEach(r => recipeSel.appendChild(el('option', {value:r.id, text:(r.is_favourite ? '★ ' : '') + r.title})));
+  const all = recipes || [];
+  // Recipes still showing in the New recipes tab get their own group at the top so they're
+  // easy to add to the plan right after generating, instead of being buried under favourites.
+  const currentIds = new Set((state.currentResults||[]).map(r => r.id));
+  const justGenerated = all.filter(r => currentIds.has(r.id));
+  const others = all.filter(r => !currentIds.has(r.id));
+  if(justGenerated.length){
+    const grp = el('optgroup', {label:'✨ Just generated (New recipes tab)'});
+    justGenerated.forEach(r => grp.appendChild(el('option', {value:r.id, text:(r.is_favourite ? '★ ' : '') + r.title})));
+    recipeSel.appendChild(grp);
+  }
+  if(others.length){
+    const grp2 = el('optgroup', {label: justGenerated.length ? 'Other saved recipes' : 'Saved recipes'});
+    others.forEach(r => grp2.appendChild(el('option', {value:r.id, text:(r.is_favourite ? '★ ' : '') + r.title})));
+    recipeSel.appendChild(grp2);
+  }
   const loSel = document.getElementById('mealLeftoverSelect');
   loSel.innerHTML = '';
   loSel.appendChild(el('option', {value:'', text:'— none —'}));
@@ -2506,7 +2686,7 @@ document.getElementById('mealSaveBtn').addEventListener('click', async () => {
     recipe_id: recipeId, manual_title: manual || (leftoverId ? leftoverTitle : null),
     servings, notes, use_leftovers: !!leftoverId, leftover_id: leftoverId
   };
-  const { data, error } = await safeDb(supabase.from('meal_plan_items').insert(row).select('*, recipes(id,title,servings,ingredients)').single(), 'Could not add the meal');
+  const { data, error } = await safeDb(supabase.from('meal_plan_items').insert(row).select('*, recipes(id,title,servings,ingredients,steps)').single(), 'Could not add the meal');
   if(error) return;
   mpItems.push(data);
   if(cookTwice){
@@ -2520,10 +2700,10 @@ document.getElementById('mealSaveBtn').addEventListener('click', async () => {
     }
     const { data: second } = await safeDb(supabase.from('meal_plan_items').insert({
       meal_plan_id: plan2.id, household_id: household.id,
-      meal_date: nextDayStr, meal_slot: mealModalContext.slot,
+      meal_date: nextDayStr, meal_slot: 'lunch',
       recipe_id: recipeId, manual_title: manual, servings,
       use_leftovers: true, notes: 'Cook once, eat twice — leftovers from the day before'
-    }).select('*, recipes(id,title,servings,ingredients)').single(), 'Could not add the leftover meal');
+    }).select('*, recipes(id,title,servings,ingredients,steps)').single(), 'Could not add the leftover meal');
     if(second && second.meal_date >= isoDate(mpWeekStart)) mpItems.push(second);
   }
   document.getElementById('mealModal').classList.add('hidden');
@@ -2535,8 +2715,21 @@ async function createListFromMeals(items, title){
   const cookMeals = items.filter(m => !m.use_leftovers); // leftover meals don't need shopping
   const withRecipes = cookMeals.filter(m => m.recipes?.ingredients?.length);
   if(!withRecipes.length){ showToast('No recipe-backed meals there to shop for', true); return; }
+  const list = await ensureDraftList(title, 'meal_plan');
+  if(!list) return;
+  // Skip recipes whose ingredients are already in this list, so re-running "shopping list
+  // for the week" (or overlapping day/selected-meal lists) doesn't double up quantities.
+  const recipeIds = withRecipes.map(m => m.recipe_id).filter(Boolean);
+  const already = await recipeIdsAlreadyInList(list.id, recipeIds);
+  const newMeals = withRecipes.filter(m => !m.recipe_id || !already.has(m.recipe_id));
+  const skippedForDup = withRecipes.length - newMeals.length;
+  if(!newMeals.length){
+    showToast('All of those recipes are already in "' + list.title + '"');
+    openShoppingTab(list.id);
+    return;
+  }
   const aggregated = {};
-  withRecipes.forEach(m => {
+  newMeals.forEach(m => {
     const scale = (m.servings && m.recipes.servings) ? m.servings / m.recipes.servings : 1;
     (m.recipes.ingredients||[]).forEach(ing => {
       const amt = parseFloat(ing.amount);
@@ -2548,16 +2741,17 @@ async function createListFromMeals(items, title){
       }
     });
   });
-  const list = await ensureDraftList(title, 'meal_plan');
-  if(!list) return;
   const listItems = Object.values(aggregated).map(ing => {
     const rounded = typeof ing.amount === 'number' ? Number(ing.amount.toFixed(2)) : ing.amount;
     return ingredientToListItem({ ...ing, amount: rounded }, ing.recipeId);
   });
   const ok = await addItemsToList(list, listItems);
   if(!ok) return;
-  const skipped = cookMeals.length - withRecipes.length;
-  showToast('Added ' + listItems.length + ' item(s) to "' + list.title + '"' + (skipped ? ` (${skipped} manual meal(s) skipped — no ingredient data)` : ''));
+  const skippedManual = cookMeals.length - withRecipes.length;
+  const notes = [];
+  if(skippedManual) notes.push(`${skippedManual} manual meal(s) skipped — no ingredient data`);
+  if(skippedForDup) notes.push(`${skippedForDup} recipe(s) already in the list, skipped`);
+  showToast('Added ' + listItems.length + ' item(s) to "' + list.title + '"' + (notes.length ? ` (${notes.join('; ')})` : ''));
   openShoppingTab(list.id);
 }
 document.getElementById('mpListWeekBtn').addEventListener('click', () => createListFromMeals(mpItems, 'Meal plan — week of ' + mpWeekStart.toLocaleDateString('en-IE', {day:'numeric', month:'short'})));
