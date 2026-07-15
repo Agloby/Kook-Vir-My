@@ -43,6 +43,7 @@
 
   .chip-grid{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;}
   .chip{border:1px solid var(--line); background:var(--card-raised); color:var(--text); padding:8px 14px; border-radius:999px; font-size:13.5px; cursor:pointer;}
+  button.chip{font-family:inherit; appearance:none; -webkit-appearance:none; text-align:left;}
   .chip:hover{border-color:var(--saffron-dim);}
   .chip.selected{background:var(--saffron); border-color:var(--saffron); color:#1F2421; font-weight:600;}
   .chip.warn.selected{background:var(--warn); border-color:var(--warn); color:#1F2421;}
@@ -279,8 +280,8 @@
         <div class="stepper"><button type="button" id="servingsMinus">−</button><span class="val measure" id="servingsVal">2</span><button type="button" id="servingsPlus">+</button></div>
         <label class="field-label">Units</label>
         <div class="row" id="unitsToggle">
-          <div class="chip selected" data-unit="metric">Metric (g, ml, °C)</div>
-          <div class="chip" data-unit="us">US (cups, oz, °F)</div>
+          <button type="button" class="chip selected" data-unit="metric">Metric (g, ml, °C)</button>
+          <button type="button" class="chip" data-unit="us">US (cups, oz, °F)</button>
         </div>
         <div class="hint" id="profileHint" style="margin-top:16px;"></div>
       </section>
@@ -325,11 +326,11 @@
         <h2>Add manually</h2>
         <div class="row">
           <input type="text" id="manItemName" placeholder="Item name" style="flex:2;">
-          <input type="number" id="manItemQty" placeholder="Qty" step="0.1" style="width:80px;">
+          <input type="number" id="manItemQty" placeholder="Qty" step="0.1" min="0" style="width:80px;">
           <input type="text" id="manItemUnit" placeholder="unit" style="width:80px;">
         </div>
         <div class="row" style="margin-top:10px;">
-          <input type="number" id="manItemPar" placeholder="Always keep at least…" step="0.1" style="flex:1;">
+          <input type="number" id="manItemPar" placeholder="Always keep at least…" step="0.1" min="0" style="flex:1;">
           <input type="text" id="manItemExpiry" placeholder="yyyy-mm-dd (optional)" style="width:150px;">
           <label style="font-size:12.5px; display:flex; align-items:center; gap:6px;"><input type="checkbox" id="manItemTrack"> track use in recipes</label>
         </div>
@@ -400,10 +401,10 @@
 
         <label class="field-label">Fulfilment</label>
         <div class="chip-grid" id="slFulfilChips">
-          <div class="chip" data-fm="delivery">Delivery</div>
-          <div class="chip" data-fm="click_collect">Click &amp; Collect</div>
-          <div class="chip" data-fm="in_store">In-store shopping</div>
-          <div class="chip" data-fm="whatsapp">WhatsApp list only</div>
+          <button type="button" class="chip" data-fm="delivery">Delivery</button>
+          <button type="button" class="chip" data-fm="click_collect">Click &amp; Collect</button>
+          <button type="button" class="chip" data-fm="in_store">In-store shopping</button>
+          <button type="button" class="chip" data-fm="whatsapp">WhatsApp list only</button>
         </div>
 
         <label class="field-label" for="slRetailerSelect">Retailer</label>
@@ -545,10 +546,10 @@
   <div class="modal-inner">
     <h3 style="margin-bottom:16px;">Any leftovers?</h3>
     <div class="chip-grid" id="leftoverChips">
-      <div class="chip" data-amt="none">None</div>
-      <div class="chip" data-amt="a little">A little</div>
-      <div class="chip" data-amt="a portion">A portion</div>
-      <div class="chip" data-amt="several portions">Several portions</div>
+      <button type="button" class="chip" data-amt="none">None</button>
+      <button type="button" class="chip" data-amt="a little">A little</button>
+      <button type="button" class="chip" data-amt="a portion">A portion</button>
+      <button type="button" class="chip" data-amt="several portions">Several portions</button>
     </div>
     <div class="row">
       <button class="btn ghost" id="skipLeftoverBtn" type="button">Skip</button>
@@ -620,6 +621,12 @@
 <script type="module">
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { PEPESTO_RETAILERS, PEPESTO_ESTIMATED_PRICES_EUR, rankComparisonResults, cheapestCompleteDomain, createRequestGate, settleRetailerComparisons, validHandoffUrl } from './pepesto-helpers.js';
+import {
+  CATEGORY_ORDER, categorizeIngredient, getItemCategory,
+  normalizeIngredientName, namesMatch, unitToBase, convertUnits,
+  mergeUnitKey, baseIngredientKey, cleanIngredientDisplayName, mergeCompatibleQuantity,
+  mondayOf, isoDate, daysUntil
+} from './recipe-helpers.js';
 
 const SUPABASE_URL = "https://iwncoqufcivqgjvlynaz.supabase.co";
 const SUPABASE_KEY = "sb_publishable_g0dydQ6d0xLcYMoViBFzzw_w1QAXtpp";
@@ -705,7 +712,17 @@ async function showApp(){
     maybeShowExpiryNotification();
   } catch(err){
     console.error('Startup failed:', err);
-    document.getElementById('appShell').innerHTML = `<div class="wrap"><div class="panel"><div class="error-box">Setup isn't finished yet: ${err.message}</div><button class="btn ghost small" onclick="location.reload()" type="button">Retry</button></div></div>`;
+    // Built via el()/textContent rather than innerHTML - err.message ends up here unescaped otherwise.
+    const shell = document.getElementById('appShell');
+    shell.innerHTML = '';
+    const retryBtn = el('button', {class:'btn ghost small', type:'button', text:'Retry'});
+    retryBtn.addEventListener('click', () => location.reload());
+    shell.appendChild(el('div', {class:'wrap'}, [
+      el('div', {class:'panel'}, [
+        el('div', {class:'error-box', text: "Setup isn't finished yet: " + err.message}),
+        retryBtn
+      ])
+    ]));
   }
 }
 
@@ -719,7 +736,7 @@ async function loadProfile(){
   }
   profile = data || { id: session.user.id, units_preference:'metric', goals:{} };
   state.units = profile.units_preference || 'metric';
-  document.querySelectorAll('#unitsToggle .chip').forEach(c => c.classList.toggle('selected', c.dataset.unit === state.units));
+  document.querySelectorAll('#unitsToggle .chip').forEach(c => { const sel = c.dataset.unit === state.units; c.classList.toggle('selected', sel); c.setAttribute('aria-pressed', String(sel)); });
   const g = profile.goals || {};
   document.getElementById('goalWeightInput').value = g.weight || '';
   document.getElementById('goalTrainingInput').value = g.training || '';
@@ -778,6 +795,9 @@ document.getElementById('joinHouseholdBtn').addEventListener('click', async () =
   const code = document.getElementById('joinCodeInput').value.trim();
   const status = document.getElementById('joinStatus');
   if(!code) return;
+  // Joining another household reassigns your own membership row away from this one - make
+  // sure that's really intended before it happens, since there's no undo without the old code.
+  if(!confirm('Joining this code will move your account to that household, and you\'ll stop seeing this household\'s recipes, pantry and lists (unless you still have its invite code to switch back). Continue?')) return;
   const { error } = await supabase.rpc('join_household', { p_code: code });
   if(error){ status.textContent = 'Could not join: ' + error.message; return; }
   status.textContent = 'Joined. Reloading your household…';
@@ -794,23 +814,27 @@ document.getElementById('joinHouseholdBtn').addEventListener('click', async () =
 function renderProfileTab(){
   const allergyWrap = document.getElementById('profAllergyChips'); allergyWrap.innerHTML = '';
   ALLERGENS.forEach(a => {
-    const chip = el('div', {class:'chip warn' + ((household.allergies||[]).includes(a) ? ' selected':''), text:a});
+    const isSelected = (household.allergies||[]).includes(a);
+    const chip = el('button', {type:'button', class:'chip warn' + (isSelected ? ' selected':''), 'aria-pressed': String(isSelected), text:a});
     chip.addEventListener('click', () => {
       household.allergies = household.allergies || [];
       const i = household.allergies.indexOf(a);
       if(i>-1) household.allergies.splice(i,1); else household.allergies.push(a);
       chip.classList.toggle('selected');
+      chip.setAttribute('aria-pressed', String(chip.classList.contains('selected')));
     });
     allergyWrap.appendChild(chip);
   });
   const dietWrap = document.getElementById('profDietChips'); dietWrap.innerHTML = '';
   DIETS.forEach(d => {
-    const chip = el('div', {class:'chip' + ((household.diets||[]).includes(d) ? ' selected':''), text:d});
+    const isSelected = (household.diets||[]).includes(d);
+    const chip = el('button', {type:'button', class:'chip' + (isSelected ? ' selected':''), 'aria-pressed': String(isSelected), text:d});
     chip.addEventListener('click', () => {
       household.diets = household.diets || [];
       const i = household.diets.indexOf(d);
       if(i>-1) household.diets.splice(i,1); else household.diets.push(d);
       chip.classList.toggle('selected');
+      chip.setAttribute('aria-pressed', String(chip.classList.contains('selected')));
     });
     dietWrap.appendChild(chip);
   });
@@ -826,13 +850,13 @@ document.getElementById('saveDietBtn').addEventListener('click', async () => {
 document.querySelectorAll('#unitsToggle .chip').forEach(chip => {
   chip.addEventListener('click', async () => {
     const previous = state.units;
-    document.querySelectorAll('#unitsToggle .chip').forEach(c => c.classList.remove('selected'));
-    chip.classList.add('selected');
+    document.querySelectorAll('#unitsToggle .chip').forEach(c => { c.classList.remove('selected'); c.setAttribute('aria-pressed', 'false'); });
+    chip.classList.add('selected'); chip.setAttribute('aria-pressed', 'true');
     state.units = chip.dataset.unit;
     const { error } = await safeDb(supabase.from('profiles').update({ units_preference: state.units }).eq('id', session.user.id), 'Could not save units preference');
     if(error){
       state.units = previous;
-      document.querySelectorAll('#unitsToggle .chip').forEach(c => c.classList.toggle('selected', c.dataset.unit === previous));
+      document.querySelectorAll('#unitsToggle .chip').forEach(c => { const sel = c.dataset.unit === previous; c.classList.toggle('selected', sel); c.setAttribute('aria-pressed', String(sel)); });
     }
   });
 });
@@ -983,16 +1007,23 @@ function haversineKm(lat1, lon1, lat2, lon2){
 }
 
 // ---------------- INGREDIENT PRICES ----------------
+// Keyed by normalizeIngredientName (not raw lowercase text) so a saved price for "onion"
+// is found again for "onions" or "red onion" later, same normalization used for pantry matching.
 async function loadIngredientPrices(){
   const { data } = await safeDb(supabase.from('ingredient_prices').select('*').eq('household_id', household.id), 'Could not load your saved prices');
   ingredientPrices = {};
-  (data||[]).forEach(row => { ingredientPrices[row.ingredient_name.toLowerCase()] = row; });
+  (data||[]).forEach(row => { ingredientPrices[normalizeIngredientName(row.ingredient_name)] = row; });
 }
+// Every caller passes unit=null, and Postgres treats NULL as never equal to NULL for
+// ON CONFLICT matching - an upsert against (household_id,ingredient_name,unit) with a null
+// unit therefore never finds the existing row, it just inserts a fresh duplicate every time.
+// Look the row up ourselves and update by id when it already exists instead.
 async function saveIngredientPrice(name, unit, price){
-  const key = name.toLowerCase();
-  const { data, error } = await safeDb(supabase.from('ingredient_prices')
-    .upsert({ household_id: household.id, ingredient_name: name, unit, price }, { onConflict:'household_id,ingredient_name,unit' })
-    .select().single(), 'Could not save the price');
+  const key = normalizeIngredientName(name);
+  const existing = ingredientPrices[key];
+  const { data, error } = existing
+    ? await safeDb(supabase.from('ingredient_prices').update({ price, unit }).eq('id', existing.id).select().single(), 'Could not save the price')
+    : await safeDb(supabase.from('ingredient_prices').insert({ household_id: household.id, ingredient_name: name, unit, price }).select().single(), 'Could not save the price');
   if(error) return false;
   if(data) ingredientPrices[key] = data;
   showToast('Price saved');
@@ -1015,8 +1046,11 @@ document.querySelectorAll('.tabs button').forEach(btn => {
 // ---------------- WIZARD (cuisine / on-hand / details) ----------------
 const cuisineChipsEl = document.getElementById('cuisineChips');
 CUISINES.forEach(c => {
-  const chip = el('div', {class:'chip', text:c});
-  chip.addEventListener('click', () => { state.cuisines.has(c) ? (state.cuisines.delete(c), chip.classList.remove('selected')) : (state.cuisines.add(c), chip.classList.add('selected')); });
+  const chip = el('button', {type:'button', class:'chip', 'aria-pressed':'false', text:c});
+  chip.addEventListener('click', () => {
+    state.cuisines.has(c) ? (state.cuisines.delete(c), chip.classList.remove('selected')) : (state.cuisines.add(c), chip.classList.add('selected'));
+    chip.setAttribute('aria-pressed', String(chip.classList.contains('selected')));
+  });
   cuisineChipsEl.appendChild(chip);
 });
 document.getElementById('cuisineFree').addEventListener('input', e => state.cuisineFree = e.target.value);
@@ -1076,33 +1110,6 @@ function scanForAllergens(recipe, allergyList){
     if(matched.length) hits.push({ allergen: a, matched });
   });
   return hits;
-}
-
-// ---------------- SHOPPING LIST CATEGORIES (aisle-style grouping) ----------------
-// Best-effort keyword grouping so a list reads the way a shop is laid out (produce
-// together, meat/fish together, etc.) rather than in whatever order ingredients were
-// listed. Order here also sets display/export order.
-const CATEGORY_ORDER = ['Fruit & Veg', 'Meat & Fish', 'Dairy & Eggs', 'Bakery', 'Pantry & Dry Goods', 'Tins & Jars', 'Frozen', 'Drinks', 'Household & Other'];
-const CATEGORY_KEYWORDS = {
-  'Fruit & Veg': ['onion','garlic','tomato','potato','carrot','pepper','courgette','aubergine','cucumber','lettuce','spinach','kale','broccoli','cauliflower','mushroom','apple','banana','lemon','lime','orange','avocado','ginger','chilli','chili','herb','parsley','coriander','basil','mint','rocket','celery','leek','sweetcorn','scallion','spring onion'],
-  'Meat & Fish': ['chicken','beef','pork','lamb','mince','minced beef','bacon','sausage','turkey','salmon','tuna','cod','prawn','shrimp','fish','anchovy','trout','mackerel','sardine','haddock','ham','chorizo','steak'],
-  'Dairy & Eggs': ['milk','cheese','butter','cream','yogurt','yoghurt','egg','parmesan','mozzarella','feta','cheddar','crème fraîche','mascarpone'],
-  'Bakery': ['bread','baguette','roll','bun','tortilla','wrap','pitta','naan','bagel'],
-  'Frozen': ['frozen','ice cream','peas'],
-  'Tins & Jars': ['tinned','canned','tin of','jar of','passata','tomato puree','tomato paste','chickpea','kidney bean','baked beans'],
-  'Drinks': ['wine','beer','juice','soda','water','coffee','tea'],
-  'Pantry & Dry Goods': ['flour','sugar','rice','pasta','spaghetti','penne','noodle','oil','olive oil','vinegar','stock','stock cube','herbs','spice','salt','pepper','pepper flakes','cumin','paprika','oregano','cinnamon','honey','soy sauce','yeast','baking powder','couscous','lentil','oat']
-};
-function categorizeIngredient(name){
-  const lower = (name||'').toLowerCase();
-  for(const cat of CATEGORY_ORDER){
-    const keywords = CATEGORY_KEYWORDS[cat];
-    if(keywords && keywords.some(k => lower.includes(k))) return cat;
-  }
-  return 'Household & Other';
-}
-function getItemCategory(item){
-  return item.category || categorizeIngredient(item.item_name);
 }
 
 // One shared pattern for every Supabase read/write that matters: awaits the query,
@@ -1311,7 +1318,7 @@ async function persistRecipes(parsed){
 function computeCost(ingredients){
   let total = 0, savedCount = 0, estimatedCount = 0;
   ingredients.forEach(ing => {
-    const stored = ingredientPrices[(ing.item||'').toLowerCase()];
+    const stored = ingredientPrices[normalizeIngredientName(ing.item)];
     if(stored){ total += Number(stored.price); savedCount++; }
     else { total += Number(ing.estimatedPriceEur)||0; estimatedCount++; }
   });
@@ -1326,6 +1333,10 @@ function costSourceNote(c){
 
 function renderResults(recipes, onHandAlternative){
   const body = document.getElementById('resultsBody'); body.innerHTML = '';
+  if(!recipes.length && !onHandAlternative){
+    body.appendChild(el('div', {class:'panel hint', text:'No recipes came back this time — try adjusting your filters and generating again.'}));
+    return;
+  }
   const onHandLower = state.onHand.map(x=>x.toLowerCase());
   recipes.forEach(r => body.appendChild(buildRecipeCard(r, onHandLower)));
   if(onHandAlternative){
@@ -1409,11 +1420,14 @@ function buildRecipeCard(r, onHandLower, isAlt){
   const ingCol = el('div'); ingCol.appendChild(el('h4', {text:'Ingredients'}));
   const ingList = el('ul', {class:'ing-list'});
   (r.ingredients||[]).forEach(ing => {
-    const isOnHand = onHandLower.some(o => (ing.item||'').toLowerCase().includes(o));
+    // "Have" reflects either what was typed into the wizard's on-hand box, or actual
+    // Koskas pantry stock (same matching used for pantry deduction) - not on-hand alone.
+    const isOnHand = onHandLower.some(o => (ing.item||'').toLowerCase().includes(o))
+      || pantryItems.some(p => p.quantity > 0 && namesMatch(ing.item, p.name));
     const li = el('li', isOnHand ? {class:'have'} : {});
     li.appendChild(el('span', {class:'item', text:ing.item||''}));
     const right = el('span', {class:'amt', text:[ing.amount, ing.unit].filter(Boolean).join(' ')});
-    const stored = ingredientPrices[(ing.item||'').toLowerCase()];
+    const stored = ingredientPrices[normalizeIngredientName(ing.item)];
     if(stored) right.title = '€' + Number(stored.price).toFixed(2) + ' — your saved household price';
     else if(ing.estimatedPriceEur != null) right.title = '€' + Number(ing.estimatedPriceEur).toFixed(2) + ' — AI estimate, not a real price';
     ingList.appendChild(li);
@@ -1445,7 +1459,7 @@ function buildRecipeCard(r, onHandLower, isAlt){
   const priceRow = el('div', {class:'row', style:'margin-top:8px;'});
   const priceSelect = el('select');
   (r.ingredients||[]).forEach(ing => priceSelect.appendChild(el('option', {value:ing.item, text:ing.item})));
-  const priceInput = el('input', {type:'number', step:'0.01', placeholder:'€', style:'width:90px;'});
+  const priceInput = el('input', {type:'number', step:'0.01', min:'0', placeholder:'€', style:'width:90px;'});
   const priceSaveBtn = el('button', {class:'btn ghost small', type:'button', text:'Save price'});
   priceSaveBtn.addEventListener('click', async () => {
     const val = parseFloat(priceInput.value); if(isNaN(val)) return;
@@ -1483,12 +1497,6 @@ async function loadPantry(){
   renderPantryList();
   renderShoppingNeeded();
   renderExpiringPanel();
-}
-
-function daysUntil(dateStr){
-  if(!dateStr) return null;
-  const d = new Date(dateStr + 'T00:00:00');
-  return Math.ceil((d - new Date(new Date().toDateString())) / 86400000);
 }
 
 function renderPantryList(){
@@ -1665,7 +1673,7 @@ function buildScanResultRow(it){
   const inputRow = el('div', {class:'row', style:'margin-top:8px;'});
   const nameInput = el('input', {type:'text', style:'flex:2;'}); nameInput.value = it.name;
   const numericGuess = parseFloat(it.estimatedQuantity);
-  const qtyInput = el('input', {type:'number', step:'0.1', placeholder:'qty', style:'width:80px;'});
+  const qtyInput = el('input', {type:'number', step:'0.1', min:'0', placeholder:'qty', style:'width:80px;'});
   qtyInput.value = isNaN(numericGuess) ? '' : numericGuess;
   const unitInput = el('input', {type:'text', style:'width:70px;'}); unitInput.value = it.unit||'';
   const expInput = el('input', {type:'text', placeholder:'yyyy-mm-dd', style:'width:120px;'}); expInput.value = it.expiryDateGuess||'';
@@ -1710,110 +1718,6 @@ function renderLeftovers(){
     row.appendChild(eatBtn);
     wrap.appendChild(row);
   });
-}
-
-// ---------------- INGREDIENT NAME / UNIT NORMALIZATION ----------------
-// Conservative on purpose: a wrong match silently corrupts the stock register,
-// a missed match just means the user adjusts by hand.
-const INGREDIENT_SYNONYMS = {
-  'scallion':'spring onion', 'scallions':'spring onion', 'green onion':'spring onion',
-  'cilantro':'coriander', 'zucchini':'courgette', 'eggplant':'aubergine',
-  'garbanzo bean':'chickpea', 'garbanzo':'chickpea',
-  'bell pepper':'pepper', 'capsicum':'pepper',
-  'mince':'minced beef', 'ground beef':'minced beef',
-  'rocket':'rocket', 'arugula':'rocket',
-  'corn':'sweetcorn', 'maize':'sweetcorn',
-  'tinned tomato':'tinned tomatoes', 'canned tomato':'tinned tomatoes', 'canned tomatoes':'tinned tomatoes'
-};
-function singularize(word){
-  if(word.length <= 3) return word;
-  if(word.endsWith('ies')) return word.slice(0,-3) + 'y';
-  if(word.endsWith('oes')) return word.slice(0,-2);
-  if(word.endsWith('ses') || word.endsWith('xes') || word.endsWith('zes') || word.endsWith('ches') || word.endsWith('shes')) return word.slice(0,-2);
-  if(word.endsWith('ss')) return word;
-  if(word.endsWith('s')) return word.slice(0,-1);
-  return word;
-}
-function normalizeIngredientName(name){
-  let s = (name||'').toLowerCase()
-    .replace(/\(.*?\)/g, ' ')                 // "(optional)", "(diced)"
-    .replace(/[.,;:!?"'’·]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  if(INGREDIENT_SYNONYMS[s]) s = INGREDIENT_SYNONYMS[s];
-  const words = s.split(' ').map(singularize);
-  let joined = words.join(' ');
-  if(INGREDIENT_SYNONYMS[joined]) joined = INGREDIENT_SYNONYMS[joined];
-  return joined;
-}
-function namesMatch(a, b){
-  const na = normalizeIngredientName(a), nb = normalizeIngredientName(b);
-  if(!na || !nb) return false;
-  if(na === nb) return true;
-  // whole-word containment only ("onion" must not match "spring onion" one-way surprises;
-  // require the shorter name to appear as a whole-word phrase inside the longer)
-  const shorter = na.length <= nb.length ? na : nb;
-  const longer = na.length <= nb.length ? nb : na;
-  return new RegExp('(^| )' + shorter.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '( |$)').test(longer);
-}
-// Convert an amount between unit families where it is safe to do so. Returns null
-// when the conversion isn't safe to guess.
-function unitToBase(amount, unit){
-  const u = (unit||'').toLowerCase().replace(/\./g,'').trim();
-  if(['g','gram','grams'].includes(u)) return { qty: amount, base:'g' };
-  if(['kg','kilogram','kilograms'].includes(u)) return { qty: amount*1000, base:'g' };
-  if(['ml','millilitre','millilitres','milliliter','milliliters'].includes(u)) return { qty: amount, base:'ml' };
-  if(['l','litre','litres','liter','liters'].includes(u)) return { qty: amount*1000, base:'ml' };
-  if(['tsp','teaspoon','teaspoons'].includes(u)) return { qty: amount*5, base:'ml' };
-  if(['tbsp','tablespoon','tablespoons'].includes(u)) return { qty: amount*15, base:'ml' };
-  if(['','x','piece','pieces','pc','pcs','count','item','items','unit','units','tin','tins','can','cans','pack','packs','clove','cloves','egg','eggs'].includes(u)) return { qty: amount, base:'count:'+u };
-  return null;
-}
-function convertUnits(amount, fromUnit, toUnit){
-  const f = (fromUnit||'').toLowerCase().trim(), t = (toUnit||'').toLowerCase().trim();
-  if(f === t) return amount;
-  const from = unitToBase(amount, fromUnit), to = unitToBase(1, toUnit);
-  if(!from || !to) return null;
-  if(from.base.startsWith('count:') && to.base.startsWith('count:')){
-    // pieces/count only convert when they are literally the same unit word
-    return f === t ? amount : null;
-  }
-  if(from.base !== to.base) return null;
-  return from.qty / to.qty; // to.qty is the base-size of 1 target unit
-}
-
-// ---------------- SHOPPING LIST INGREDIENT MERGING ----------------
-// Recipes phrase the same shop item differently ("2 lemons", "zest of 1 lemon", "juice of 1
-// lemon") - a shopping list that keeps those as three separate lines is not a proper list.
-// These helpers fold matching lines together when items are added, whether they come from the
-// same batch or a separate recipe added later.
-const PLAIN_COUNT_UNITS = new Set(['', 'x', 'whole', 'each', 'piece', 'pieces', 'unit', 'units']);
-function mergeUnitKey(unit){
-  const u = (unit||'').toLowerCase().trim();
-  return PLAIN_COUNT_UNITS.has(u) ? '' : u; // fold plain-count wordings into one bucket
-}
-// Only strips prep phrasing for MATCHING (aggressive is fine here); display name is cleaned
-// separately and more conservatively so it stays readable.
-function baseIngredientKey(name){
-  let s = (name||'').toLowerCase().trim();
-  s = s.replace(/^(zest of|juice of|a handful of|a pinch of|a splash of|a drizzle of)\s+/, '');
-  s = s.replace(/,?\s*\b(zested|grated|peeled|chopped|sliced|crushed|minced|diced|juiced)\b\s*$/, '');
-  return normalizeIngredientName(s);
-}
-function cleanIngredientDisplayName(name){
-  let s = (name||'').trim();
-  s = s.replace(/^(zest of|juice of|a handful of|a pinch of|a splash of|a drizzle of)\s+/i, '');
-  s = s.replace(/\s*,?\s*\b(zested|grated|peeled|chopped|sliced|crushed|minced|diced|juiced)\b\s*$/i, '');
-  return s.trim() || name;
-}
-// Tries to combine two quantities into one real number; returns null when that isn't safe
-// (different, unconvertible units, or either side is a vague amount like "to taste").
-function mergeCompatibleQuantity(existingQty, existingUnit, newQty, newUnit){
-  if(existingQty == null || newQty == null) return null;
-  if(mergeUnitKey(existingUnit) === mergeUnitKey(newUnit)) return { quantity: Number((existingQty + newQty).toFixed(2)), unit: existingUnit || newUnit };
-  const converted = convertUnits(newQty, newUnit, existingUnit);
-  if(converted !== null) return { quantity: Number((existingQty + converted).toFixed(2)), unit: existingUnit };
-  return null;
 }
 
 // ---------------- MARK AS COOKED: reviewed pantry deduction + leftover prompt ----------------
@@ -2137,7 +2041,13 @@ document.getElementById('newListBtn').addEventListener('click', async () => {
 // Reuse the most recent draft list, or create one. Used by recipe cards, Koskas and the meal plan.
 async function ensureDraftList(title, source){
   await loadShoppingLists();
-  const draft = shoppingLists.find(l => l.status === 'draft');
+  // Reuse an existing draft only when it's the same kind of list (so a "Restock list" click
+  // doesn't silently dump into an unrelated recipe-sourced draft) or was started very recently
+  // (so re-adding another meal/recipe within the same session still lands in one list) -
+  // otherwise the requested title would be discarded with no sign anything happened.
+  const RECENT_MS = 24 * 60 * 60 * 1000;
+  const draft = shoppingLists.find(l => l.status === 'draft' &&
+    (l.source === source || (Date.now() - new Date(l.created_at).getTime()) < RECENT_MS));
   if(draft) return draft;
   const { data, error } = await safeDb(supabase.from('shopping_lists').insert({
     household_id: household.id, title, source, created_by: session.user.id
@@ -2302,7 +2212,7 @@ function renderListDetail(){
   const l = currentList;
   document.getElementById('slDetailTitle').textContent = l.title;
   document.getElementById('slDetailSub').textContent = `Status: ${l.status} · created ${new Date(l.created_at).toLocaleDateString('en-IE')}. Everything here saves automatically for the whole household.`;
-  document.querySelectorAll('#slFulfilChips .chip').forEach(c => c.classList.toggle('selected', c.dataset.fm === l.fulfilment_method));
+  document.querySelectorAll('#slFulfilChips .chip').forEach(c => { const sel = c.dataset.fm === l.fulfilment_method; c.classList.toggle('selected', sel); c.setAttribute('aria-pressed', String(sel)); });
   const sel = document.getElementById('slRetailerSelect');
   sel.innerHTML = '';
   sel.appendChild(el('option', {value:'', text:'— choose a retailer —'}));
@@ -2341,7 +2251,7 @@ document.querySelectorAll('#slFulfilChips .chip').forEach(chip => {
   chip.addEventListener('click', async () => {
     if(!currentList) return;
     const ok = await updateCurrentList({ fulfilment_method: chip.dataset.fm }, 'Could not save the fulfilment choice');
-    if(ok) document.querySelectorAll('#slFulfilChips .chip').forEach(c => c.classList.toggle('selected', c === chip));
+    if(ok) document.querySelectorAll('#slFulfilChips .chip').forEach(c => { c.classList.toggle('selected', c === chip); c.setAttribute('aria-pressed', String(c === chip)); });
   });
 });
 
@@ -2520,7 +2430,7 @@ function buildListItemRow(item){
   nameWrap.appendChild(nameInput);
   row.appendChild(nameWrap);
 
-  const qtyInput = el('input', {type:'number', step:'0.1', placeholder:'qty', style:'width:70px;'});
+  const qtyInput = el('input', {type:'number', step:'0.1', min:'0', placeholder:'qty', style:'width:70px;'});
   if(item.quantity != null) qtyInput.value = item.quantity;
   qtyInput.addEventListener('change', () => saveField('quantity', qtyInput.value === '' ? null : parseFloat(qtyInput.value), qtyInput));
   row.appendChild(qtyInput);
@@ -2676,16 +2586,6 @@ document.getElementById('slDeleteBtn').addEventListener('click', async () => {
 // ---------------- MEAL PLAN ----------------
 const MP_SLOTS = ['breakfast','lunch','dinner'];
 
-function mondayOf(d){
-  const date = new Date(d); date.setHours(0,0,0,0);
-  const day = (date.getDay() + 6) % 7; // Monday = 0
-  date.setDate(date.getDate() - day);
-  return date;
-}
-// local-date formatting on purpose: toISOString() is UTC and would shift
-// local-midnight dates back a day during Irish summer time
-function isoDate(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
-
 async function loadMealPlan(){
   if(!mpWeekStart) mpWeekStart = mondayOf(new Date());
   const weekStr = isoDate(mpWeekStart);
@@ -2788,7 +2688,7 @@ async function openMealModal(dateStr, slot){
   const recipeSel = document.getElementById('mealRecipeSelect');
   recipeSel.innerHTML = '';
   recipeSel.appendChild(el('option', {value:'', text:'— none —'}));
-  const { data: recipes } = await safeDb(supabase.from('recipes').select('id,title,is_favourite,servings').eq('household_id', household.id).order('is_favourite', {ascending:false}).order('generated_at', {ascending:false}).limit(40), 'Could not load recipes');
+  const { data: recipes } = await safeDb(supabase.from('recipes').select('id,title,is_favourite,servings').eq('household_id', household.id).order('is_favourite', {ascending:false}).order('generated_at', {ascending:false}).limit(200), 'Could not load recipes');
   const all = recipes || [];
   // Recipes still showing in the New recipes tab get their own group at the top so they're
   // easy to add to the plan right after generating, instead of being buried under favourites.
@@ -2880,15 +2780,22 @@ async function createListFromMeals(items, title){
   }
   const aggregated = {};
   newMeals.forEach(m => {
-    const scale = (m.servings && m.recipes.servings) ? m.servings / m.recipes.servings : 1;
+    const scale = (m.servings && m.recipes.servings > 0) ? m.servings / m.recipes.servings : 1;
     (m.recipes.ingredients||[]).forEach(ing => {
       const amt = parseFloat(ing.amount);
-      const key = normalizeIngredientName(ing.item) + '|' + (ing.unit||'').toLowerCase();
-      if(aggregated[key] && !isNaN(amt)){
-        aggregated[key].amount = (parseFloat(aggregated[key].amount)||0) + amt * scale;
-      } else if(!aggregated[key]){
-        aggregated[key] = { ...ing, amount: isNaN(amt) ? ing.amount : amt * scale, recipeId: m.recipe_id };
+      const scaledAmt = isNaN(amt) ? null : amt * scale;
+      // Same key scheme (and same merge helper) addItemsToList uses below, so aggregating a
+      // week's meals here and folding into an existing list line later never disagree about
+      // what counts as "the same ingredient".
+      const key = baseIngredientKey(ing.item) + '|' + mergeUnitKey(ing.unit);
+      const existing = aggregated[key];
+      if(!existing){
+        aggregated[key] = { ...ing, amount: scaledAmt == null ? ing.amount : scaledAmt, recipeId: m.recipe_id };
+        return;
       }
+      if(scaledAmt == null) return; // can't safely fold a non-numeric amount in, keep the first one
+      const merged = mergeCompatibleQuantity(existing.amount, existing.unit, scaledAmt, ing.unit);
+      if(merged){ existing.amount = merged.quantity; existing.unit = merged.unit; }
     });
   });
   const listItems = Object.values(aggregated).map(ing => {
@@ -3105,7 +3012,7 @@ function buildBarcodeConfirmCard(code, product){
   const row1 = el('div', {class:'row', style:'margin-top:10px;'});
   const nameInput = el('input', {type:'text', placeholder:'Item name', style:'flex:2; min-width:160px;'});
   nameInput.value = product ? (product.product_name || '') : '';
-  const qtyInput = el('input', {type:'number', step:'0.1', placeholder:'qty', style:'width:80px;'});
+  const qtyInput = el('input', {type:'number', step:'0.1', min:'0', placeholder:'qty', style:'width:80px;'});
   qtyInput.value = qtyGuess;
   const unitInput = el('input', {type:'text', placeholder:'unit', style:'width:70px;'});
   unitInput.value = unitGuess;

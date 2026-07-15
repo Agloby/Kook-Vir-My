@@ -5,9 +5,13 @@ const ALLOWED_ORIGINS = [
   "https://www.kookvirjou.com"
 ];
 
+// Only this project's own Netlify site (production alias + deploy/branch previews) -
+// origin.endsWith(".netlify.app") would accept any Netlify-hosted site, not just this one.
+const NETLIFY_SITE_RE = /^https:\/\/([a-z0-9-]+--)?kookvirmy\.netlify\.app$/i;
+
 function corsHeaders(req: Request) {
   const origin = req.headers.get("origin") || "";
-  const isAllowed = ALLOWED_ORIGINS.includes(origin) || origin.endsWith(".netlify.app") || origin === "http://localhost:8888";
+  const isAllowed = ALLOWED_ORIGINS.includes(origin) || NETLIFY_SITE_RE.test(origin) || origin === "http://localhost:8888";
   return {
     "Access-Control-Allow-Origin": isAllowed ? origin : ALLOWED_ORIGINS[0],
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
