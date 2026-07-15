@@ -1755,6 +1755,40 @@ function convertUnits(amount, fromUnit, toUnit){
   return from.qty / to.qty; // to.qty is the base-size of 1 target unit
 }
 
+// ---------------- SHOPPING LIST INGREDIENT MERGING ----------------
+// Recipes phrase the same shop item differently ("2 lemons", "zest of 1 lemon", "juice of 1
+// lemon") - a shopping list that keeps those as three separate lines is not a proper list.
+// These helpers fold matching lines together when items are added, whether they come from the
+// same batch or a separate recipe added later.
+const PLAIN_COUNT_UNITS = new Set(['', 'x', 'whole', 'each', 'piece', 'pieces', 'unit', 'units']);
+function mergeUnitKey(unit){
+  const u = (unit||'').toLowerCase().trim();
+  return PLAIN_COUNT_UNITS.has(u) ? '' : u; // fold plain-count wordings into one bucket
+}
+// Only strips prep phrasing for MATCHING (aggressive is fine here); display name is cleaned
+// separately and more conservatively so it stays readable.
+function baseIngredientKey(name){
+  let s = (name||'').toLowerCase().trim();
+  s = s.replace(/^(zest of|juice of|a handful of|a pinch of|a splash of|a drizzle of)\s+/, '');
+  s = s.replace(/,?\s*\b(zested|grated|peeled|chopped|sliced|crushed|minced|diced|juiced)\b\s*$/, '');
+  return normalizeIngredientName(s);
+}
+function cleanIngredientDisplayName(name){
+  let s = (name||'').trim();
+  s = s.replace(/^(zest of|juice of|a handful of|a pinch of|a splash of|a drizzle of)\s+/i, '');
+  s = s.replace(/\s*,?\s*\b(zested|grated|peeled|chopped|sliced|crushed|minced|diced|juiced)\b\s*$/i, '');
+  return s.trim() || name;
+}
+// Tries to combine two quantities into one real number; returns null when that isn't safe
+// (different, unconvertible units, or either side is a vague amount like "to taste").
+function mergeCompatibleQuantity(existingQty, existingUnit, newQty, newUnit){
+  if(existingQty == null || newQty == null) return null;
+  if(mergeUnitKey(existingUnit) === mergeUnitKey(newUnit)) return { quantity: Number((existingQty + newQty).toFixed(2)), unit: existingUnit || newUnit };
+  const converted = convertUnits(newQty, newUnit, existingUnit);
+  if(converted !== null) return { quantity: Number((existingQty + converted).toFixed(2)), unit: existingUnit };
+  return null;
+}
+
 // ---------------- MARK AS COOKED: reviewed pantry deduction + leftover prompt ----------------
 function computePantryDeductions(recipe){
   const proposals = [];
@@ -2086,20 +2120,64 @@ async function ensureDraftList(title, source){
   return data;
 }
 
+// Adds items to a list, merging any that match an ingredient already on the list (whether
+// already-persisted from an earlier add, or another item in this same batch) instead of
+// creating a duplicate line - see baseIngredientKey/mergeCompatibleQuantity above.
 async function addItemsToList(list, items){
   if(!items.length) return true;
-  const { count } = await supabase.from('shopping_list_items').select('*', { count:'exact', head:true }).eq('shopping_list_id', list.id);
-  const base = count || 0;
-  const rows = items.map((it, i) => ({
-    shopping_list_id: list.id, household_id: household.id,
-    item_name: it.item_name, quantity: it.quantity ?? null, unit: it.unit ?? null,
-    quantity_text: it.quantity_text ?? null, category: it.category ?? null, notes: it.notes ?? null,
-    status: it.status || 'required', source: it.source || 'manual',
-    recipe_id: it.recipe_id ?? null, pantry_item_id: it.pantry_item_id ?? null,
-    sort_order: base + i
-  }));
-  const { error } = await safeDb(supabase.from('shopping_list_items').insert(rows), 'Could not add items to the list');
-  return !error;
+  const { data: existingRows, error: fetchErr } = await safeDb(supabase.from('shopping_list_items').select('*').eq('shopping_list_id', list.id), 'Could not read the list before adding items');
+  if(fetchErr) return false;
+  const existing = existingRows || [];
+  const byKey = new Map();
+  existing.forEach(row => {
+    if(row.status === 'bought') return; // once bought, don't silently fold new demand back into that line
+    byKey.set(baseIngredientKey(row.item_name) + '|' + mergeUnitKey(row.unit), row);
+  });
+
+  const toInsert = [];
+  const toUpdate = [];
+  let nextSort = existing.length;
+
+  for(const it of items){
+    const key = baseIngredientKey(it.item_name) + '|' + mergeUnitKey(it.unit);
+    const match = byKey.get(key);
+    if(match){
+      const merged = mergeCompatibleQuantity(match.quantity, match.unit, it.quantity, it.unit);
+      if(merged){
+        match.quantity = merged.quantity; match.unit = merged.unit;
+        match.quantity_text = `${merged.quantity}${merged.unit ? ' ' + merged.unit : ''}`;
+      } else {
+        // Can't combine into one number (e.g. "zest of 1" + "juice of 1") - keep it to one
+        // line anyway and say so honestly, rather than inventing a precise total.
+        const combined = [match.quantity_text, it.quantity_text].filter(Boolean).join(' + ');
+        match.quantity = null; match.unit = null;
+        match.quantity_text = combined ? combined + ' (combined from multiple recipes)' : match.quantity_text;
+      }
+      if(match.pantry_item_id == null && it.pantry_item_id != null) match.pantry_item_id = it.pantry_item_id;
+      if(match.id) toUpdate.push({ id: match.id, quantity: match.quantity, unit: match.unit, quantity_text: match.quantity_text, pantry_item_id: match.pantry_item_id });
+      continue;
+    }
+    const row = {
+      shopping_list_id: list.id, household_id: household.id,
+      item_name: cleanIngredientDisplayName(it.item_name), quantity: it.quantity ?? null, unit: it.unit ?? null,
+      quantity_text: it.quantity_text ?? null, category: it.category ?? null, notes: it.notes ?? null,
+      status: it.status || 'required', source: it.source || 'manual',
+      recipe_id: it.recipe_id ?? null, pantry_item_id: it.pantry_item_id ?? null,
+      sort_order: nextSort++
+    };
+    toInsert.push(row);
+    byKey.set(key, row); // later items in this same batch can still merge into it before it's inserted
+  }
+
+  for(const u of toUpdate){
+    const { error } = await safeDb(supabase.from('shopping_list_items').update({ quantity: u.quantity, unit: u.unit, quantity_text: u.quantity_text, pantry_item_id: u.pantry_item_id }).eq('id', u.id), 'Could not update a merged item');
+    if(error) return false;
+  }
+  if(toInsert.length){
+    const { error } = await safeDb(supabase.from('shopping_list_items').insert(toInsert), 'Could not add items to the list');
+    if(error) return false;
+  }
+  return true;
 }
 
 // Pantry-aware conversion of recipe ingredients into shopping list items. Conservative:
