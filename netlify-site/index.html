@@ -2446,6 +2446,16 @@ function renderPepestoResults(results){
   });
 }
 
+async function pepestoInvokeErrorMessage(error){
+  try {
+    if(error?.context && typeof error.context.clone === 'function'){
+      const payload = await error.context.clone().json();
+      if(typeof payload?.error === 'string' && payload.error.trim()) return payload.error.trim();
+    }
+  } catch(_ignored){ /* fall back to the SDK message */ }
+  return error?.message || 'Comparison failed';
+}
+
 async function comparePepestoBaskets(){
   if(!currentList) return;
   if(!currentListItems.some(item => item.status === 'required')){
@@ -2460,7 +2470,7 @@ async function comparePepestoBaskets(){
       renderPepestoLoading();
       const settled = await settleRetailerComparisons(PEPESTO_RETAILERS, async retailer => {
         const { data, error } = await supabase.functions.invoke('pepesto-basket', {body:{shoppingListId:listId, retailerDomain:retailer.domain, mode:'compare'}});
-        if(error) throw new Error(error.message || 'Comparison failed');
+        if(error) throw new Error(await pepestoInvokeErrorMessage(error));
         if(!data || data.error) throw new Error(data?.error || 'Comparison failed');
         return data;
       });
