@@ -51,6 +51,7 @@ Deno.test("normalises genuine products response fields", () => {
   assertEquals(result.matchedCount, 1);
   assertEquals(result.unmatchedCount, 1);
   assertEquals(result.estimatedTotal, 3.6);
+  assertEquals(result.pricedSubtotal, 3.6);
   assertEquals(result.completeBasket, false);
   assertEquals(result.redirectUrl, "https://buy.pepesto.com/cart/abc");
 });

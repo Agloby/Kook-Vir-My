@@ -10,7 +10,9 @@ import {
 const ALLOWED_ORIGINS = ["https://kookvirjou.com", "https://www.kookvirjou.com"];
 const MAX_BODY_BYTES = 2048;
 const PEPESTO_ENDPOINT = "https://s.pepesto.com/api/products";
-const REQUEST_TIMEOUT_MS = 20_000;
+// Some retailer caches respond more slowly than others. Keep one billable call,
+// but allow enough time for the slower Irish retailer response to complete.
+const REQUEST_TIMEOUT_MS = 45_000;
 
 function corsHeaders(req: Request) {
   const origin = req.headers.get("origin") || "";
