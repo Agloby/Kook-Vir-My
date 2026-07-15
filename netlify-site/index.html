@@ -1203,6 +1203,9 @@ async function generateRecipes(){
 
 async function callClaudeForRecipes(prompt){
   let response;
+  // Scale the token budget with how much output was actually requested, plus headroom for
+  // the onHandAlternative recipe - a fixed budget truncated mid-JSON once a few recipes were asked for.
+  const maxTokens = Math.min(8000, 1500 + state.recipeCount * 1300);
   try {
     response = await fetch(`${SUPABASE_URL}/functions/v1/generate-recipes`, {
       method: "POST",
@@ -1210,7 +1213,7 @@ async function callClaudeForRecipes(prompt){
         "Content-Type": "application/json",
         "Authorization": "Bearer " + session.access_token
       },
-      body: JSON.stringify({ prompt, max_tokens: 4500 })
+      body: JSON.stringify({ prompt, max_tokens: maxTokens })
     });
   } catch(networkErr){
     throw new Error('Network error calling the recipe function (' + (networkErr.message || networkErr.name) + ').');
@@ -1221,7 +1224,18 @@ async function callClaudeForRecipes(prompt){
   }
   let raw = (data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n').trim();
   raw = raw.replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
-  try { return JSON.parse(raw); } catch(e){ throw new Error('Response was not valid JSON.'); }
+  // Model output can carry stray preamble/trailing text around the fenced block even after
+  // stripping the fences, and a truncated response (hit max_tokens) ends mid-object - trim to
+  // the outermost braces so a parse failure reports the truncation, not incidental text around it.
+  const first = raw.indexOf('{'), last = raw.lastIndexOf('}');
+  if(first !== -1 && last > first) raw = raw.slice(first, last + 1);
+  try { return JSON.parse(raw); }
+  catch(e){
+    const truncated = data.stop_reason === 'max_tokens' || !raw.trim().endsWith('}');
+    throw new Error(truncated
+      ? 'The response was cut off before it finished (too many recipes requested at once). Try fewer recipes.'
+      : 'Response was not valid JSON.');
+  }
 }
 
 async function persistRecipes(parsed){
