@@ -2432,7 +2432,10 @@ function renderPepestoResults(results){
       card.appendChild(el('div', {class:'hint', text:result.error}));
       wrap.appendChild(card); return;
     }
-    card.appendChild(el('div', {class:'pepesto-total', text:Number.isFinite(result.estimatedTotal) ? euro(result.estimatedTotal, result.currency) : 'Total unavailable'}));
+    card.appendChild(el('div', {class:'pepesto-total', text:Number.isFinite(result.estimatedTotal) ? euro(result.estimatedTotal, result.currency) : 'Full total unavailable'}));
+    if(!Number.isFinite(result.estimatedTotal) && Number.isFinite(result.pricedSubtotal)){
+      card.appendChild(el('div', {class:'hint', text:'Priced items subtotal: ' + euro(result.pricedSubtotal, result.currency) + ' (excludes products without a current price)'}));
+    }
     card.appendChild(el('div', {class:'hint', text:`${result.matchedCount} matched · ${result.unmatchedCount} unmatched`}));
     card.appendChild(el('div', {class:'hint', text:result.completeBasket ? 'Complete basket match' : 'Incomplete basket — review unmatched items'}));
     card.appendChild(el('div', {class:'hint', text:'Compared ' + new Date(result.requestedAt).toLocaleString('en-IE')}));

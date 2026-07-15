@@ -149,6 +149,7 @@ export function normalisePepestoResponse(
     matchedCount: matchedItems.length,
     unmatchedCount: unmatchedItems.length,
     subtotal: matchedItems.length && everySelectedProductHasPrice ? subtotalCents / 100 : null,
+    pricedSubtotal: matchedItems.length && subtotalCents > 0 ? subtotalCents / 100 : null,
     estimatedTotal: matchedItems.length && everySelectedProductHasPrice ? subtotalCents / 100 : null,
     currency: typeof raw.currency === "string" ? raw.currency : "EUR",
     completeBasket: matchedItems.length > 0 && unmatchedItems.length === 0,
