@@ -152,6 +152,17 @@
   .sl-item.already_have .sl-name input, .sl-item.bought .sl-name input{opacity:0.5; text-decoration:line-through;}
   .list-card{cursor:pointer;}
   .list-card:hover{border-color:var(--saffron-dim);}
+  .pepesto-section{margin-top:22px; padding-top:18px; border-top:1px solid var(--line);}
+  .pepesto-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin-top:14px;}
+  .pepesto-card{border:1px solid var(--line); border-radius:8px; background:var(--card-raised); padding:15px;}
+  .pepesto-card.complete{border-color:var(--ok);}
+  .pepesto-card.incomplete,.pepesto-card.failed{border-color:var(--warn);}
+  .pepesto-total{font-family:'IBM Plex Mono',monospace; font-size:20px; color:var(--saffron); margin:8px 0;}
+  .pepesto-badge{display:inline-block; border-radius:999px; padding:3px 8px; font:10px 'IBM Plex Mono',monospace; background:var(--saffron); color:var(--bg); margin-top:6px;}
+  .pepesto-review{margin-top:10px; border-top:1px dashed var(--line); padding-top:8px;}
+  .pepesto-match{display:flex; gap:9px; padding:8px 0; border-bottom:1px solid var(--line); font-size:12px;}
+  .pepesto-match img{width:46px; height:46px; object-fit:contain; background:#fff; border-radius:5px;}
+  .pepesto-unmatched{color:#F2C6BE; margin:6px 0; font-size:12px;}
 
   /* Meal plan grid */
   .mp-day{border:1px solid var(--line); border-radius:var(--radius); background:var(--card); margin-bottom:12px; overflow:hidden;}
@@ -370,7 +381,7 @@
     <section id="tabShopping" class="hidden">
       <section class="panel" id="slOverviewPanel">
         <h2>Shopping lists</h2>
-        <div class="sub">Saved for the whole household — they survive reloads and both of you see the same lists. Kook vir Jou builds and shares the list; it cannot add items to a retailer's basket or place an order for you, because no Irish grocery retailer offers a public API for that. The buttons below open the retailer's own site.</div>
+        <div class="sub">Saved for the whole household — they survive reloads and both of you see the same lists. Kook vir Jou can compare supported retailer products and hand a selected list to Pepesto. Retailer login, substitutions, delivery slots and final payment remain under your control.</div>
         <div class="row">
           <input type="text" id="newListTitle" placeholder="New list name, e.g. Weekly shop" style="flex:1;">
           <button class="btn small" id="newListBtn" type="button">Create list</button>
@@ -405,6 +416,18 @@
           <button class="btn ghost small" id="slExtraAdd" type="button">Add</button>
           <button class="btn ghost small" id="slAddLowStockBtn" type="button">Add low-stock items</button>
         </div>
+
+        <section class="pepesto-section" aria-labelledby="pepestoHeading">
+          <h3 id="pepestoHeading">Compare supermarket baskets</h3>
+          <div class="hint">Compare this list at Tesco, Dunnes and SuperValu. Prices, local stock, loyalty discounts, delivery charges and final availability may change after retailer login.</div>
+          <div class="row" style="margin-top:12px;">
+            <button class="btn small" id="pepestoCompareBtn" type="button">Compare Tesco, Dunnes &amp; SuperValu</button>
+            <button class="btn ghost small hidden" id="pepestoRefreshBtn" type="button">Refresh prices</button>
+            <span class="hint" id="pepestoCostEstimate" style="margin-top:0;"></span>
+          </div>
+          <div id="pepestoResults" class="pepesto-grid" aria-live="polite"></div>
+          <div class="hint" style="margin-top:12px;">Product matching is not an allergen guarantee. Always check the actual product label, especially for Coeliac / gluten-free requirements.</div>
+        </section>
 
         <label class="field-label">Share / export</label>
         <div class="row">
@@ -589,11 +612,12 @@
 <div id="printArea" class="hidden"></div>
 
 <footer class="note">
-  Cost, calorie and protein figures marked * are AI estimates, not measured values; figures from your saved prices or from Open Food Facts are labelled with their source. The allergy warnings in this app are a best-effort keyword check, not a certified allergen check — it can miss hidden ingredients and flag harmless ones. Always check the actual product label, especially for Coeliac / gluten-free requirements. Photo-scanned pantry items are the AI's best guess at what's in the picture; nothing saves without your confirmation. Nothing in this app can place an order or add items to a retailer's basket for you — it builds the list and opens the retailer's own site.
+  Cost, calorie and protein figures marked * are AI estimates, not measured values; figures from your saved prices or from Open Food Facts are labelled with their source. The allergy warnings in this app are a best-effort keyword check, not a certified allergen check — it can miss hidden ingredients and flag harmless ones. Always check the actual product label, especially for Coeliac / gluten-free requirements. Photo-scanned pantry items are the AI's best guess at what's in the picture; nothing saves without your confirmation. Kook vir Jou can compare supported retailer products and hand the selected list to Pepesto's checkout process. Retailer login, delivery-slot selection, substitutions, loyalty pricing, product-label verification and final payment remain under your control.
 </footer>
 
 <script type="module">
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { PEPESTO_RETAILERS, PEPESTO_ESTIMATED_PRICES_EUR, rankComparisonResults, cheapestCompleteDomain, createRequestGate, settleRetailerComparisons, validHandoffUrl } from './pepesto-helpers.js';
 
 const SUPABASE_URL = "https://iwncoqufcivqgjvlynaz.supabase.co";
 const SUPABASE_KEY = "sb_publishable_g0dydQ6d0xLcYMoViBFzzw_w1QAXtpp";
@@ -624,6 +648,9 @@ function el(tag, attrs, children){
 let session = null, profile = null, household = null, shops = [], ingredientPrices = {}, pantryItems = [], leftovers = [];
 let lastDeduction = [];
 let shoppingLists = [], currentList = null, currentListItems = [];
+const pepestoResultsByList = new Map();
+const pepestoRequestGate = createRequestGate();
+document.getElementById('pepestoCostEstimate').textContent = `Estimated Pepesto API cost: €${(PEPESTO_RETAILERS.length * PEPESTO_ESTIMATED_PRICES_EUR.products).toFixed(2)} for three €${PEPESTO_ESTIMATED_PRICES_EUR.products.toFixed(2)} product-match requests.`;
 let mpWeekStart = null, mpPlan = null, mpItems = [], mpSelected = new Set();
 let recipeTagsCache = {}; // recipe_id -> Set of this user's tags
 const state = {
@@ -2157,6 +2184,7 @@ function renderListDetail(){
   sel.value = l.retailer_name || '';
   renderRetailerInfo();
   renderListItems();
+  renderPepestoResults(pepestoResultsByList.get(l.id) || []);
   document.getElementById('slCompleteBtn').classList.toggle('hidden', l.status === 'completed');
   document.getElementById('slReopenBtn').classList.toggle('hidden', l.status !== 'completed');
 }
@@ -2177,7 +2205,7 @@ function renderRetailerInfo(){
     box.textContent = bits.join(' · ') + '. ' + info.note + (info.delivery === null ? ' (Unverified — details may be out of date.)' : '');
     const a = el('a', {href: info.url, target:'_blank', rel:'noopener', class:'btn ghost small', style:'text-decoration:none;', text:'Open ' + currentList.retailer_name + ' shopping'});
     linkRow.appendChild(a);
-    linkRow.appendChild(el('span', {class:'hint', style:'margin-top:0;', text:'Opens their site — Kook vir Jou cannot add items to their basket or place the order.'}));
+    linkRow.appendChild(el('span', {class:'hint', style:'margin-top:0;', text:'Opens the retailer site directly. Pepesto handoff is available in the comparison section; retailer login and payment stay with you.'}));
   } else {
     box.textContent = 'No fulfilment details on file for this retailer.';
   }
@@ -2205,6 +2233,110 @@ function renderListItems(){
   }
   currentListItems.forEach(item => wrap.appendChild(buildListItemRow(item)));
 }
+
+function euro(value, currency = 'EUR'){
+  return new Intl.NumberFormat('en-IE', {style:'currency', currency}).format(value);
+}
+
+function renderPepestoLoading(){
+  const wrap = document.getElementById('pepestoResults');
+  wrap.innerHTML = '';
+  PEPESTO_RETAILERS.forEach(retailer => {
+    const card = el('div', {class:'pepesto-card'});
+    card.appendChild(el('div', {style:'font-weight:600;', text:retailer.name}));
+    card.appendChild(el('div', {class:'hint', text:'Comparing required items…'}));
+    wrap.appendChild(card);
+  });
+}
+
+function buildPepestoReview(result){
+  const details = el('details', {class:'pepesto-review'});
+  details.appendChild(el('summary', {text:'View matched products'}));
+  (result.matchedItems || []).forEach(match => {
+    const row = el('div', {class:'pepesto-match'});
+    if(match.productImage) row.appendChild(el('img', {src:match.productImage, alt:''}));
+    const text = el('div');
+    text.appendChild(el('div', {text:match.requestedItem + ' → ' + (match.productName || 'Matched product')}));
+    const facts = [match.packSize, match.packs ? match.packs + ' pack(s)' : null,
+      Number.isFinite(match.unitPrice) ? euro(match.unitPrice, result.currency) + ' each' : null,
+      Number.isFinite(match.lineTotal) ? euro(match.lineTotal, result.currency) + ' line total' : null,
+      match.isSubstitution ? 'Pepesto marks this as a substitution' : null].filter(Boolean);
+    if(facts.length) text.appendChild(el('div', {class:'hint', text:facts.join(' · ')}));
+    row.appendChild(text); details.appendChild(row);
+  });
+  if(!(result.matchedItems || []).length) details.appendChild(el('div', {class:'hint', text:'No product matches were returned.'}));
+  if((result.unmatchedItems || []).length){
+    details.appendChild(el('div', {class:'pepesto-unmatched', text:'Unmatched items'}));
+    result.unmatchedItems.forEach(item => details.appendChild(el('div', {class:'pepesto-unmatched', text:'• ' + item.requestedItem})));
+  }
+  return details;
+}
+
+function renderPepestoResults(results){
+  const wrap = document.getElementById('pepestoResults');
+  wrap.innerHTML = '';
+  if(!results.length){
+    document.getElementById('pepestoRefreshBtn').classList.add('hidden');
+    return;
+  }
+  document.getElementById('pepestoRefreshBtn').classList.remove('hidden');
+  const successful = results.filter(r => !r.error);
+  const cheapestDomain = cheapestCompleteDomain(successful);
+  const ordered = [...rankComparisonResults(successful), ...results.filter(r => r.error)];
+  ordered.forEach(result => {
+    const failed = Boolean(result.error);
+    const card = el('div', {class:'pepesto-card ' + (failed ? 'failed' : (result.completeBasket ? 'complete' : 'incomplete'))});
+    card.appendChild(el('div', {style:'font-weight:600;', text:result.retailer.name}));
+    if(!failed && result.retailer.domain === cheapestDomain) card.appendChild(el('span', {class:'pepesto-badge', text:'Cheapest complete basket'}));
+    if(failed){
+      card.appendChild(el('div', {class:'pepesto-total', text:'Comparison failed'}));
+      card.appendChild(el('div', {class:'hint', text:result.error}));
+      wrap.appendChild(card); return;
+    }
+    card.appendChild(el('div', {class:'pepesto-total', text:Number.isFinite(result.estimatedTotal) ? euro(result.estimatedTotal, result.currency) : 'Total unavailable'}));
+    card.appendChild(el('div', {class:'hint', text:`${result.matchedCount} matched · ${result.unmatchedCount} unmatched`}));
+    card.appendChild(el('div', {class:'hint', text:result.completeBasket ? 'Complete basket match' : 'Incomplete basket — review unmatched items'}));
+    card.appendChild(el('div', {class:'hint', text:'Compared ' + new Date(result.requestedAt).toLocaleString('en-IE')}));
+    (result.warnings || []).forEach(warning => card.appendChild(el('div', {class:'hint', style:'color:#F2C6BE;', text:warning})));
+    card.appendChild(buildPepestoReview(result));
+    const redirectUrl = validHandoffUrl(result.redirectUrl);
+    if(redirectUrl){
+      card.appendChild(el('a', {class:'btn small', href:redirectUrl, target:'_blank', rel:'noopener noreferrer', style:'display:inline-block; text-decoration:none; margin-top:10px;', text:'Review basket at ' + result.retailer.name}));
+    }
+    wrap.appendChild(card);
+  });
+}
+
+async function comparePepestoBaskets(){
+  if(!currentList) return;
+  if(!currentListItems.some(item => item.status === 'required')){
+    showToast('Add at least one required item before comparing', true); return;
+  }
+  await pepestoRequestGate.run(async () => {
+    const button = document.getElementById('pepestoCompareBtn');
+    const refresh = document.getElementById('pepestoRefreshBtn');
+    button.disabled = true; refresh.disabled = true;
+    try {
+      const listId = currentList.id;
+      renderPepestoLoading();
+      const settled = await settleRetailerComparisons(PEPESTO_RETAILERS, async retailer => {
+        const { data, error } = await supabase.functions.invoke('pepesto-basket', {body:{shoppingListId:listId, retailerDomain:retailer.domain, mode:'compare'}});
+        if(error) throw new Error(error.message || 'Comparison failed');
+        if(!data || data.error) throw new Error(data?.error || 'Comparison failed');
+        return data;
+      });
+      const results = settled.map((entry, index) => entry.status === 'fulfilled' ? entry.value : {
+        retailer:PEPESTO_RETAILERS[index], error:entry.reason?.message || 'This retailer comparison failed.'
+      });
+      pepestoResultsByList.set(listId, results);
+      if(currentList?.id === listId) renderPepestoResults(results);
+    } finally {
+      button.disabled = false; refresh.disabled = false;
+    }
+  });
+}
+document.getElementById('pepestoCompareBtn').addEventListener('click', comparePepestoBaskets);
+document.getElementById('pepestoRefreshBtn').addEventListener('click', comparePepestoBaskets);
 
 function buildListItemRow(item){
   const row = el('div', {class:'sl-item ' + item.status});
