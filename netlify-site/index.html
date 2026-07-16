@@ -233,6 +233,7 @@
   <nav class="tabs">
     <button data-tab="recipes" class="active">New recipes</button>
     <button data-tab="favourites">Favourites</button>
+    <button data-tab="library">Library</button>
     <button data-tab="koskas">Koskas</button>
     <button data-tab="plan">Meal plan</button>
     <button data-tab="shopping">Shopping</button>
@@ -360,6 +361,32 @@
       <div id="favouritesBody"></div>
     </section>
 
+    <!-- TAB: LIBRARY (every recipe you've actually cooked, with ratings + comments) -->
+    <section id="tabLibrary" class="hidden">
+      <section class="panel">
+        <h2>Recipe library</h2>
+        <div class="sub">Every recipe your household has marked as cooked. Rate it, leave yourself a comment for next time, and both update right here — no need to hunt for the original card.</div>
+        <div id="libraryStats" class="hint" style="margin-bottom:14px;"></div>
+        <input type="text" id="libSearch" placeholder="Search title or comments…" style="margin-bottom:12px;">
+        <div class="row" style="margin-bottom:4px;">
+          <select id="libSort" style="width:auto; flex:1; min-width:180px;">
+            <option value="recent">Recently cooked</option>
+            <option value="stale">Haven't had in a while</option>
+            <option value="rating">Highest rated (yours)</option>
+            <option value="most_cooked">Most cooked</option>
+            <option value="title">Title A–Z</option>
+          </select>
+          <select id="libCuisine" style="width:auto; flex:1; min-width:160px;">
+            <option value="">All cuisines</option>
+          </select>
+          <label style="font-size:12.5px; display:flex; align-items:center; gap:6px; white-space:nowrap;">
+            <input type="checkbox" id="libCanCookNow"> I can cook this right now
+          </label>
+        </div>
+      </section>
+      <div id="libraryBody"></div>
+    </section>
+
     <!-- TAB: MEAL PLAN -->
     <section id="tabPlan" class="hidden">
       <section class="panel">
@@ -375,6 +402,7 @@
         <div class="row" style="margin-bottom:16px;">
           <button class="btn ghost small" id="mpListWeekBtn" type="button">Shopping list: whole week</button>
           <button class="btn ghost small" id="mpListSelectedBtn" type="button">Shopping list: ticked meals</button>
+          <button class="btn ghost small" id="mpRepeatLastWeekBtn" type="button">Repeat last week</button>
         </div>
         <div id="mpGrid"></div>
       </section>
@@ -578,6 +606,7 @@
     <div class="hint" id="mealModalSub" style="margin-bottom:14px;"></div>
     <label class="field-label" for="mealRecipeSelect">Recipe</label>
     <select id="mealRecipeSelect"></select>
+    <div class="hint" id="mealLastCookedHint"></div>
     <label class="field-label" for="mealManualInput">Or a manual meal</label>
     <input type="text" id="mealManualInput" placeholder="e.g. Toasties and soup">
     <label class="field-label" for="mealLeftoverSelect">Or use logged leftovers</label>
@@ -662,6 +691,9 @@ const pepestoRequestGate = createRequestGate();
 document.getElementById('pepestoCostEstimate').textContent = `Estimated comparison cost: €${(PEPESTO_RETAILERS.length * PEPESTO_ESTIMATED_PRICES_EUR.products).toFixed(2)}. Creating one retailer basket costs approximately €${PEPESTO_ESTIMATED_PRICES_EUR.oneshot.toFixed(2)} extra.`;
 let mpWeekStart = null, mpPlan = null, mpItems = [], mpSelected = new Set();
 let recipeTagsCache = {}; // recipe_id -> Set of this user's tags
+let myRatings = {}; // recipe_id -> this user's {taste,convenience,cost,serving_size,comment}
+let libraryRecipes = [], libraryRatingsByRecipe = {}; // recipe_id -> array of every household member's rating row
+let mealRecipeLookup = {}; // recipe_id -> {last_cooked_at,times_cooked,...} for the rotation nudge in the add-meal modal
 const state = {
   cuisines: new Set(), cuisineFree:"", onHand:[], recipeCount:3, servings:2, units:"metric",
   currentResults: null
@@ -1035,8 +1067,9 @@ document.querySelectorAll('.tabs button').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    ['recipes','favourites','koskas','plan','shopping','profile'].forEach(t => document.getElementById('tab'+t[0].toUpperCase()+t.slice(1)).classList.toggle('hidden', t !== btn.dataset.tab));
+    ['recipes','favourites','library','koskas','plan','shopping','profile'].forEach(t => document.getElementById('tab'+t[0].toUpperCase()+t.slice(1)).classList.toggle('hidden', t !== btn.dataset.tab));
     if(btn.dataset.tab === 'favourites') loadFavourites();
+    if(btn.dataset.tab === 'library') loadLibrary();
     if(btn.dataset.tab === 'koskas'){ loadPantry(); loadLeftovers(); }
     if(btn.dataset.tab === 'plan') loadMealPlan();
     if(btn.dataset.tab === 'shopping') loadShoppingLists();
@@ -1380,6 +1413,7 @@ function buildRecipeCard(r, onHandLower, isAlt){
     actions.appendChild(rateBtn);
     const cookedBtn = el('button', {class:'btn ghost small', type:'button', text:'Mark as cooked'});
     cookedBtn.addEventListener('click', () => {
+      recordCooked(r);
       // Review step: nothing is deducted until the user confirms in the modal.
       openDeductModal(r, (applied) => {
         cookedBtn.textContent = 'Marked as cooked';
@@ -1721,6 +1755,20 @@ function renderLeftovers(){
 }
 
 // ---------------- MARK AS COOKED: reviewed pantry deduction + leftover prompt ----------------
+// Fires once per "Mark as cooked" click, independent of whether the user applies or skips the
+// stock deduction that follows — this is what makes a recipe show up in the Library tab.
+async function recordCooked(recipe){
+  if(!recipe.id) return;
+  const times_cooked = (recipe.times_cooked||0) + 1;
+  const last_cooked_at = new Date().toISOString();
+  const { error } = await safeDb(supabase.from('recipes').update({ times_cooked, last_cooked_at }).eq('id', recipe.id), 'Could not record that this was cooked');
+  if(error) return;
+  recipe.times_cooked = times_cooked;
+  recipe.last_cooked_at = last_cooked_at;
+  const cached = libraryRecipes.find(x => x.id === recipe.id);
+  if(cached){ cached.times_cooked = times_cooked; cached.last_cooked_at = last_cooked_at; }
+}
+
 function computePantryDeductions(recipe){
   const proposals = [];
   const trackedItems = pantryItems.filter(p => p.track_consumption);
@@ -1814,21 +1862,216 @@ async function loadFavourites(){
   data.forEach(r => body.appendChild(buildRecipeCard(r, [])));
 }
 
-// ---------------- RATING MODAL ----------------
-let ratingTarget = null;
+// ---------------- LIBRARY: completed recipes, per-person ratings + comments ----------------
+async function loadLibrary(){
+  const body = document.getElementById('libraryBody');
+  const { data, error } = await safeDb(supabase.from('recipes').select('*').eq('household_id', household.id).gt('times_cooked', 0).order('last_cooked_at', {ascending:false}), 'Could not load your recipe library');
+  if(error) return;
+  libraryRecipes = data || [];
+  libraryLoaded = true;
+  if(!libraryRecipes.length){
+    body.innerHTML = '';
+    document.getElementById('libraryStats').textContent = '';
+    body.appendChild(el('div', {class:'panel', text:'Nothing here yet — recipes you mark "Mark as cooked" will show up in your library with room for a rating and a comment.'}));
+    return;
+  }
+  const ids = libraryRecipes.map(r => r.id);
+  const [, , allRatingsRes] = await Promise.all([
+    preloadTagsForRecipes(ids),
+    preloadRatingsForRecipes(ids),
+    safeDb(supabase.from('recipe_ratings').select('recipe_id,profile_id,taste,convenience,cost,serving_size,comment').in('recipe_id', ids), 'Could not load household ratings'),
+    pantryItems.length ? Promise.resolve() : loadPantry() // needed for the "I can cook this right now" filter
+  ]);
+  libraryRatingsByRecipe = {};
+  (allRatingsRes.data||[]).forEach(r => {
+    (libraryRatingsByRecipe[r.recipe_id] = libraryRatingsByRecipe[r.recipe_id] || []).push(r);
+  });
+  const cuisineSel = document.getElementById('libCuisine');
+  const cuisines = [...new Set(libraryRecipes.map(r => r.cuisine).filter(Boolean))].sort();
+  const prevCuisine = cuisineSel.value;
+  cuisineSel.innerHTML = '';
+  cuisineSel.appendChild(el('option', {value:'', text:'All cuisines'}));
+  cuisines.forEach(c => cuisineSel.appendChild(el('option', {value:c, text:c})));
+  cuisineSel.value = cuisines.includes(prevCuisine) ? prevCuisine : '';
+  renderLibrary();
+}
+
+// Called after a rating is saved anywhere (the modal or the library card itself) so the
+// household-feedback view and "both loved this" badge don't need a full reload to catch up.
+function updateLibraryRatingCache(row){
+  const list = libraryRatingsByRecipe[row.recipe_id] = libraryRatingsByRecipe[row.recipe_id] || [];
+  const idx = list.findIndex(x => x.profile_id === row.profile_id);
+  if(idx >= 0) list[idx] = row; else list.push(row);
+}
+
+function canCookNow(r){
+  const ingredients = r.ingredients || [];
+  if(!ingredients.length) return false;
+  return ingredients.every(ing => pantryItems.some(p => p.quantity > 0 && namesMatch(ing.item, p.name)));
+}
+
+function renderLibraryStats(){
+  const el2 = document.getElementById('libraryStats');
+  if(!libraryRecipes.length){ el2.textContent = ''; return; }
+  const totalCooks = libraryRecipes.reduce((sum,r) => sum + (r.times_cooked||0), 0);
+  const mostCooked = [...libraryRecipes].sort((a,b) => (b.times_cooked||0) - (a.times_cooked||0))[0];
+  const myAvgs = libraryRecipes.map(r => avgRating(myRatings[r.id])).filter(v => v != null);
+  const overallAvg = myAvgs.length ? (myAvgs.reduce((a,b)=>a+b,0)/myAvgs.length).toFixed(1) : null;
+  const cuisineTotals = {};
+  libraryRecipes.forEach(r => {
+    if(!r.cuisine) return;
+    const avg = avgRating(myRatings[r.id]);
+    if(avg == null) return;
+    (cuisineTotals[r.cuisine] = cuisineTotals[r.cuisine] || []).push(avg);
+  });
+  let topCuisine = null;
+  Object.entries(cuisineTotals).forEach(([cuisine, vals]) => {
+    const avg = vals.reduce((a,b)=>a+b,0)/vals.length;
+    if(!topCuisine || avg > topCuisine.avg) topCuisine = { cuisine, avg };
+  });
+  const parts = [`${libraryRecipes.length} recipe(s) cooked, ${totalCooks} cook(s) total`];
+  if(overallAvg) parts.push(`your average rating ${overallAvg}★`);
+  if(mostCooked && mostCooked.times_cooked > 1) parts.push(`most cooked: "${mostCooked.title}" (${mostCooked.times_cooked}×)`);
+  if(topCuisine) parts.push(`top-rated cuisine: ${topCuisine.cuisine} (${topCuisine.avg.toFixed(1)}★)`);
+  el2.textContent = parts.join(' · ');
+}
+
+function renderLibrary(){
+  renderLibraryStats();
+  const body = document.getElementById('libraryBody'); body.innerHTML = '';
+  const search = document.getElementById('libSearch').value.trim().toLowerCase();
+  const cuisine = document.getElementById('libCuisine').value;
+  const sort = document.getElementById('libSort').value;
+  const onlyCanCook = document.getElementById('libCanCookNow').checked;
+
+  let list = libraryRecipes.slice();
+  if(cuisine) list = list.filter(r => r.cuisine === cuisine);
+  if(onlyCanCook) list = list.filter(canCookNow);
+  if(search){
+    list = list.filter(r => {
+      if((r.title||'').toLowerCase().includes(search)) return true;
+      const mine = myRatings[r.id];
+      if(mine && (mine.comment||'').toLowerCase().includes(search)) return true;
+      return (libraryRatingsByRecipe[r.id]||[]).some(x => (x.comment||'').toLowerCase().includes(search));
+    });
+  }
+  if(sort === 'recent') list.sort((a,b) => new Date(b.last_cooked_at||0) - new Date(a.last_cooked_at||0));
+  else if(sort === 'stale') list.sort((a,b) => new Date(a.last_cooked_at||0) - new Date(b.last_cooked_at||0));
+  else if(sort === 'most_cooked') list.sort((a,b) => (b.times_cooked||0) - (a.times_cooked||0));
+  else if(sort === 'title') list.sort((a,b) => (a.title||'').localeCompare(b.title||''));
+  else if(sort === 'rating') list.sort((a,b) => (avgRating(myRatings[b.id])||-1) - (avgRating(myRatings[a.id])||-1));
+
+  if(!list.length){ body.appendChild(el('div', {class:'panel hint', text:'No recipes match those filters.'})); return; }
+  list.forEach(r => body.appendChild(buildLibraryCard(r)));
+}
+['libSearch'].forEach(id => document.getElementById(id).addEventListener('input', renderLibrary));
+['libSort','libCuisine','libCanCookNow'].forEach(id => document.getElementById(id).addEventListener('change', renderLibrary));
+
+function buildLibraryCard(r){
+  const card = el('div', {class:'recipe-card'});
+  const top = el('div', {class:'rc-top'});
+  top.appendChild(el('h3', {text: r.title || 'Untitled'}));
+  if(r.description) top.appendChild(el('div', {class:'desc', text:r.description}));
+  const meta = el('div', {class:'rc-meta'});
+  if(r.cuisine) meta.appendChild(el('span', {text:r.cuisine}));
+  if(r.total_time_minutes) meta.appendChild(el('span', {text:`⏱ ${r.total_time_minutes} min`}));
+  meta.appendChild(el('span', {text: `cooked ${r.times_cooked||1}×`}));
+  if(r.last_cooked_at) meta.appendChild(el('span', {text: 'last cooked ' + new Date(r.last_cooked_at).toLocaleDateString('en-IE')}));
+  top.appendChild(meta);
+
+  const allRatings = libraryRatingsByRecipe[r.id] || [];
+  const others = allRatings.filter(x => x.profile_id !== session.user.id);
+  const myAvg = avgRating(myRatings[r.id]);
+  const bothLoved = others.length > 0 && myAvg != null && myAvg >= 4 && others.every(o => (avgRating(o)||0) >= 4);
+  if(bothLoved) top.appendChild(el('span', {class:'status-pill already_have', style:'display:inline-block; margin-top:10px;', text:'★ Both loved this'}));
+
+  const ratingBlock = el('div', {style:'margin-top:16px; border-top:1px dashed var(--line); padding-top:14px;'});
+  ratingBlock.appendChild(el('h4', {text:'Your rating', style:"font-family:'IBM Plex Mono',monospace; font-size:11.5px; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-dim); margin-bottom:10px;"}));
+  const starsWrap = el('div');
+  const ratingState = {};
+  buildStarRows(starsWrap, ratingState, myRatings[r.id]);
+  ratingBlock.appendChild(starsWrap);
+  const commentInput = el('textarea', {placeholder:'e.g. next time double the chorizo'});
+  commentInput.value = (myRatings[r.id] && myRatings[r.id].comment) || '';
+  ratingBlock.appendChild(commentInput);
+  const saveBtn = el('button', {class:'btn small', type:'button', text:'Save rating & comment', style:'margin-top:10px;'});
+  saveBtn.addEventListener('click', async () => {
+    const row = {
+      recipe_id: r.id, profile_id: session.user.id,
+      taste: ratingState.taste||null, convenience: ratingState.convenience||null,
+      cost: ratingState.cost||null, serving_size: ratingState.serving_size||null,
+      comment: commentInput.value.trim() || null
+    };
+    const { error } = await safeDb(supabase.from('recipe_ratings').upsert(row, { onConflict:'recipe_id,profile_id' }), 'Could not save your rating');
+    if(error) return;
+    myRatings[r.id] = row;
+    updateLibraryRatingCache(row);
+    showToast('Rating saved');
+    renderLibrary();
+  });
+  ratingBlock.appendChild(saveBtn);
+  top.appendChild(ratingBlock);
+
+  if(others.length){
+    const otherBlock = el('div', {style:'margin-top:14px;'});
+    otherBlock.appendChild(el('h4', {text: others.length > 1 ? 'Household feedback' : 'Their feedback', style:"font-family:'IBM Plex Mono',monospace; font-size:11.5px; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-dim); margin-bottom:6px;"}));
+    others.forEach(o => {
+      const oAvg = avgRating(o);
+      otherBlock.appendChild(el('div', {class:'hint', style:'margin-bottom:4px;', text: (oAvg != null ? '★'.repeat(Math.round(oAvg)) + ' ' : '') + (o.comment ? '"' + o.comment + '"' : '(no comment left)')}));
+    });
+    top.appendChild(otherBlock);
+  }
+
+  top.appendChild(buildQuickTagRow(r));
+
+  const actions = el('div', {class:'rc-actions'});
+  const cookAgainBtn = el('button', {class:'btn ghost small', type:'button', text:'Cook again → add to meal plan'});
+  cookAgainBtn.addEventListener('click', () => cookAgainToPlan(r));
+  actions.appendChild(cookAgainBtn);
+  top.appendChild(actions);
+  card.appendChild(top);
+
+  const details = el('details');
+  details.appendChild(el('summary', {text:'Full recipe', style:"cursor:pointer; padding:14px 22px; border-top:1px dashed var(--line); font-family:'IBM Plex Mono',monospace; font-size:11.5px; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-dim);"}));
+  let fullLoaded = false;
+  details.addEventListener('toggle', () => {
+    if(details.open && !fullLoaded){ fullLoaded = true; details.appendChild(buildRecipeCard(r, [])); }
+  });
+  card.appendChild(details);
+  return card;
+}
+
+async function cookAgainToPlan(r){
+  if(!mpWeekStart) mpWeekStart = mondayOf(new Date());
+  switchToTab('plan');
+  const todayStr = isoDate(new Date(new Date().setHours(0,0,0,0)));
+  await openMealModal(todayStr, 'dinner');
+  mealRecipeLookup[r.id] = r; // the fetch inside openMealModal is capped at 200 recipes and may not include this one
+  const sel = document.getElementById('mealRecipeSelect');
+  if([...sel.options].some(o => o.value === r.id)) sel.value = r.id;
+  else sel.appendChild(el('option', {value:r.id, text:r.title, selected:true}));
+  sel.dispatchEvent(new Event('change'));
+}
+
+// ---------------- RATING: shared star-row builder + cache ----------------
 const RATING_CATS = [['taste','Taste'],['convenience','Convenience'],['cost','Cost'],['serving_size','Serving size']];
-function openRatingModal(recipe){
-  ratingTarget = recipe;
-  const wrap = document.getElementById('starRows'); wrap.innerHTML = '';
-  ratingTarget._ratings = {};
+
+// Renders one interactive star row per category into `wrap`, pre-lit from `initial` (an
+// existing rating, if any) and writes clicks into `ratingsState` so callers can read it back
+// on save without the row markup knowing anything about where the value ends up.
+function buildStarRows(wrap, ratingsState, initial){
+  wrap.innerHTML = '';
   RATING_CATS.forEach(([key,label]) => {
+    const startVal = (initial && initial[key]) || 0;
+    if(startVal) ratingsState[key] = startVal;
     const row = el('div', {class:'star-row'});
     row.appendChild(el('div', {class:'cat', text:label}));
     const stars = el('div', {class:'stars'});
     for(let i=1;i<=5;i++){
       const s = el('span', {text:'★', 'data-val':i});
+      if(i <= startVal) s.classList.add('on');
       s.addEventListener('click', () => {
-        ratingTarget._ratings[key] = i;
+        ratingsState[key] = i;
         [...stars.children].forEach((el2,idx) => el2.classList.toggle('on', idx < i));
       });
       stars.appendChild(s);
@@ -1836,23 +2079,52 @@ function openRatingModal(recipe){
     row.appendChild(stars);
     wrap.appendChild(row);
   });
+}
+
+function avgRating(ratingObj){
+  if(!ratingObj) return null;
+  const vals = RATING_CATS.map(([k]) => ratingObj[k]).filter(v => v != null);
+  if(!vals.length) return null;
+  return vals.reduce((a,b) => a+b, 0) / vals.length;
+}
+
+async function preloadRatingsForRecipes(ids){
+  if(!ids.length) return;
+  const { data, error } = await safeDb(supabase.from('recipe_ratings')
+    .select('recipe_id,taste,convenience,cost,serving_size,comment')
+    .eq('profile_id', session.user.id).in('recipe_id', ids), 'Could not load your ratings');
+  if(error) return;
+  (data||[]).forEach(r => { myRatings[r.recipe_id] = r; });
+}
+
+// ---------------- RATING MODAL ----------------
+let ratingTarget = null;
+async function openRatingModal(recipe){
+  ratingTarget = recipe;
+  if(!(recipe.id in myRatings)) await preloadRatingsForRecipes([recipe.id]);
+  const existing = myRatings[recipe.id] || {};
+  ratingTarget._ratings = {};
+  buildStarRows(document.getElementById('starRows'), ratingTarget._ratings, existing);
   const tagWrap = document.getElementById('ratingQuickTags'); tagWrap.innerHTML = '';
   tagWrap.appendChild(buildQuickTagChips(recipe.id));
-  document.getElementById('ratingComment').value = '';
+  document.getElementById('ratingComment').value = existing.comment || '';
   document.getElementById('ratingModal').classList.remove('hidden');
 }
 document.getElementById('cancelRatingBtn').addEventListener('click', () => document.getElementById('ratingModal').classList.add('hidden'));
 document.getElementById('saveRatingBtn').addEventListener('click', async () => {
   const comment = document.getElementById('ratingComment').value.trim();
   const r = ratingTarget._ratings || {};
-  const { error } = await supabase.from('recipe_ratings').upsert({
+  const row = {
     recipe_id: ratingTarget.id, profile_id: session.user.id,
     taste:r.taste||null, convenience:r.convenience||null, cost:r.cost||null, serving_size:r.serving_size||null,
     comment: comment||null
-  }, { onConflict:'recipe_id,profile_id' });
+  };
+  const { error } = await supabase.from('recipe_ratings').upsert(row, { onConflict:'recipe_id,profile_id' });
   document.getElementById('ratingModal').classList.add('hidden');
-  if(error) showToast('Rating did not save: ' + error.message, true);
-  else showToast('Rating saved');
+  if(error){ showToast('Rating did not save: ' + error.message, true); return; }
+  myRatings[ratingTarget.id] = row;
+  updateLibraryRatingCache(row);
+  showToast('Rating saved');
 });
 
 // ---------------- PRINT ----------------
@@ -2707,6 +2979,34 @@ document.getElementById('mpPrevWeek').addEventListener('click', () => { mpWeekSt
 document.getElementById('mpNextWeek').addEventListener('click', () => { mpWeekStart.setDate(mpWeekStart.getDate() + 7); loadMealPlan(); });
 document.getElementById('mpThisWeek').addEventListener('click', () => { mpWeekStart = mondayOf(new Date()); loadMealPlan(); });
 
+document.getElementById('mpRepeatLastWeekBtn').addEventListener('click', async () => {
+  const plan = await ensurePlanRow();
+  if(!plan) return;
+  const prevStart = new Date(mpWeekStart); prevStart.setDate(prevStart.getDate() - 7);
+  const prevEnd = new Date(mpWeekStart); prevEnd.setDate(prevEnd.getDate() - 1);
+  const { data: prevItems, error } = await safeDb(supabase.from('meal_plan_items')
+    .select('meal_date,meal_slot,recipe_id,manual_title,servings,notes,use_leftovers')
+    .eq('household_id', household.id)
+    .gte('meal_date', isoDate(prevStart)).lte('meal_date', isoDate(prevEnd)), 'Could not load last week\'s meals');
+  if(error) return;
+  // Leftover-linked meals reference a specific one-off leftovers row, so they don't carry
+  // forward — only repeat meals that are a real recipe or a plain manual entry.
+  const repeatable = (prevItems||[]).filter(m => !m.use_leftovers && (m.recipe_id || m.manual_title));
+  if(!repeatable.length){ showToast('No repeatable meals in last week\'s plan', true); return; }
+  const existingKeys = new Set(mpItems.map(m => m.meal_date + '|' + m.meal_slot));
+  const rows = repeatable.map(m => {
+    const newDate = new Date(m.meal_date + 'T00:00:00'); newDate.setDate(newDate.getDate() + 7);
+    return { meal_plan_id: plan.id, household_id: household.id, meal_date: isoDate(newDate), meal_slot: m.meal_slot, recipe_id: m.recipe_id, manual_title: m.manual_title, servings: m.servings, notes: m.notes };
+  }).filter(r => !existingKeys.has(r.meal_date + '|' + r.meal_slot));
+  const skipped = repeatable.length - rows.length;
+  if(!rows.length){ showToast('This week already has meals in all those slots', true); return; }
+  const { data: inserted, error: insErr } = await safeDb(supabase.from('meal_plan_items').insert(rows).select('*, recipes(id,title,servings,ingredients,steps)'), 'Could not repeat last week\'s meals');
+  if(insErr) return;
+  mpItems.push(...(inserted||[]));
+  renderMealPlan();
+  showToast(`Added ${inserted.length} meal(s) from last week` + (skipped ? ` (${skipped} skipped — slot already filled)` : ''));
+});
+
 let mealModalContext = null;
 async function openMealModal(dateStr, slot){
   mealModalContext = { dateStr, slot };
@@ -2715,8 +3015,10 @@ async function openMealModal(dateStr, slot){
   const recipeSel = document.getElementById('mealRecipeSelect');
   recipeSel.innerHTML = '';
   recipeSel.appendChild(el('option', {value:'', text:'— none —'}));
-  const { data: recipes } = await safeDb(supabase.from('recipes').select('id,title,is_favourite,servings').eq('household_id', household.id).order('is_favourite', {ascending:false}).order('generated_at', {ascending:false}).limit(200), 'Could not load recipes');
+  const { data: recipes } = await safeDb(supabase.from('recipes').select('id,title,is_favourite,servings,last_cooked_at,times_cooked').eq('household_id', household.id).order('is_favourite', {ascending:false}).order('generated_at', {ascending:false}).limit(200), 'Could not load recipes');
   const all = recipes || [];
+  mealRecipeLookup = {};
+  all.forEach(r => { mealRecipeLookup[r.id] = r; });
   // Recipes still showing in the New recipes tab get their own group at the top so they're
   // easy to add to the plan right after generating, instead of being buried under favourites.
   const currentIds = new Set((state.currentResults||[]).map(r => r.id));
@@ -2741,9 +3043,18 @@ async function openMealModal(dateStr, slot){
   document.getElementById('mealServings').value = state.servings;
   document.getElementById('mealCookTwice').checked = false;
   document.getElementById('mealNotes').value = '';
+  document.getElementById('mealLastCookedHint').textContent = '';
   document.getElementById('mealModal').classList.remove('hidden');
 }
 document.getElementById('mealCancelBtn').addEventListener('click', () => document.getElementById('mealModal').classList.add('hidden'));
+document.getElementById('mealRecipeSelect').addEventListener('change', () => {
+  const hint = document.getElementById('mealLastCookedHint');
+  const recipe = mealRecipeLookup[document.getElementById('mealRecipeSelect').value];
+  if(!recipe || !recipe.last_cooked_at){ hint.textContent = ''; return; }
+  const days = Math.round((Date.now() - new Date(recipe.last_cooked_at)) / 86400000);
+  const when = days <= 0 ? 'today' : days === 1 ? 'yesterday' : `${days} days ago`;
+  hint.textContent = `Cooked ${recipe.times_cooked||1}× before, last ${when} — worth mixing it up?`;
+});
 document.getElementById('mealSaveBtn').addEventListener('click', async () => {
   if(!mealModalContext) return;
   const plan = await ensurePlanRow();
