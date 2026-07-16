@@ -411,6 +411,7 @@
         <div class="row" style="margin-bottom:16px;">
           <button class="btn ghost small" id="mpListWeekBtn" type="button">Shopping list: whole week</button>
           <button class="btn ghost small" id="mpListSelectedBtn" type="button">Shopping list: ticked meals</button>
+          <button class="btn ghost small" id="mpRepeatLastWeekBtn" type="button">Repeat last week</button>
         </div>
         <div id="mpGrid"></div>
       </section>
@@ -608,6 +609,7 @@
     <div class="hint" id="mealModalSub" style="margin-bottom:14px;"></div>
     <label class="field-label" for="mealRecipeSelect">Recipe</label>
     <select id="mealRecipeSelect"></select>
+    <div class="hint" id="mealLastCookedHint"></div>
     <label class="field-label" for="mealManualInput">Or a manual meal</label>
     <input type="text" id="mealManualInput" placeholder="e.g. Toasties and soup">
     <label class="field-label" for="mealLeftoverSelect">Or use logged leftovers</label>
@@ -717,6 +719,7 @@ const pepestoResultsByList = new Map();
 const pepestoRequestGate = createRequestGate();
 document.getElementById('pepestoCostEstimate').textContent = `Estimated comparison cost: €${(PEPESTO_RETAILERS.length * PEPESTO_ESTIMATED_PRICES_EUR.products).toFixed(2)}. Creating one retailer basket costs approximately €${PEPESTO_ESTIMATED_PRICES_EUR.oneshot.toFixed(2)} extra.`;
 let mpWeekStart = null, mpPlan = null, mpItems = [], mpSelected = new Set();
+let mealRecipeLookup = {}; // recipe_id -> last cook date, for the rotation hint in the add-meal modal
 let recipeTagsCache = {}; // recipe_id -> Set of this user's tags
 const state = {
   cuisines: new Set(), cuisineFree:"", onHand:[], recipeCount:3, servings:2, units:"metric",
@@ -2847,6 +2850,34 @@ document.getElementById('mpPrevWeek').addEventListener('click', () => { mpWeekSt
 document.getElementById('mpNextWeek').addEventListener('click', () => { mpWeekStart.setDate(mpWeekStart.getDate() + 7); loadMealPlan(); });
 document.getElementById('mpThisWeek').addEventListener('click', () => { mpWeekStart = mondayOf(new Date()); loadMealPlan(); });
 
+document.getElementById('mpRepeatLastWeekBtn').addEventListener('click', async () => {
+  const plan = await ensurePlanRow();
+  if(!plan) return;
+  const prevStart = new Date(mpWeekStart); prevStart.setDate(prevStart.getDate() - 7);
+  const prevEnd = new Date(mpWeekStart); prevEnd.setDate(prevEnd.getDate() - 1);
+  const { data: prevItems, error } = await safeDb(supabase.from('meal_plan_items')
+    .select('meal_date,meal_slot,recipe_id,manual_title,servings,notes,use_leftovers')
+    .eq('household_id', household.id)
+    .gte('meal_date', isoDate(prevStart)).lte('meal_date', isoDate(prevEnd)), 'Could not load last week\'s meals');
+  if(error) return;
+  // Leftover-linked meals reference a specific one-off leftovers row, so they don't carry
+  // forward — only repeat meals that are a real recipe or a plain manual entry.
+  const repeatable = (prevItems||[]).filter(m => !m.use_leftovers && (m.recipe_id || m.manual_title));
+  if(!repeatable.length){ showToast('No repeatable meals in last week\'s plan', true); return; }
+  const existingKeys = new Set(mpItems.map(m => m.meal_date + '|' + m.meal_slot));
+  const rows = repeatable.map(m => {
+    const newDate = new Date(m.meal_date + 'T00:00:00'); newDate.setDate(newDate.getDate() + 7);
+    return { meal_plan_id: plan.id, household_id: household.id, meal_date: isoDate(newDate), meal_slot: m.meal_slot, recipe_id: m.recipe_id, manual_title: m.manual_title, servings: m.servings, notes: m.notes };
+  }).filter(r => !existingKeys.has(r.meal_date + '|' + r.meal_slot));
+  const skipped = repeatable.length - rows.length;
+  if(!rows.length){ showToast('This week already has meals in all those slots', true); return; }
+  const { data: inserted, error: insErr } = await safeDb(supabase.from('meal_plan_items').insert(rows).select('*, recipes(id,title,servings,ingredients,steps)'), 'Could not repeat last week\'s meals');
+  if(insErr) return;
+  mpItems.push(...(inserted||[]));
+  renderMealPlan();
+  showToast(`Added ${inserted.length} meal(s) from last week` + (skipped ? ` (${skipped} skipped — slot already filled)` : ''));
+});
+
 let mealModalContext = null;
 async function openMealModal(dateStr, slot){
   mealModalContext = { dateStr, slot };
@@ -2857,6 +2888,9 @@ async function openMealModal(dateStr, slot){
   recipeSel.appendChild(el('option', {value:'', text:'— none —'}));
   const { data: recipes } = await safeDb(supabase.from('recipes').select('id,title,is_favourite,servings').eq('household_id', household.id).order('is_favourite', {ascending:false}).order('generated_at', {ascending:false}).limit(200), 'Could not load recipes');
   const all = recipes || [];
+  const { data: cooks } = await safeDb(supabase.from('recipe_cooks').select('recipe_id,cooked_at').eq('household_id', household.id).order('cooked_at', {ascending:false}), 'Could not load cook history');
+  mealRecipeLookup = {};
+  (cooks||[]).forEach(c => { if(!mealRecipeLookup[c.recipe_id]) mealRecipeLookup[c.recipe_id] = { lastCookedAt: c.cooked_at, timesCooked: 0 }; mealRecipeLookup[c.recipe_id].timesCooked++; });
   // Recipes still showing in the New recipes tab get their own group at the top so they're
   // easy to add to the plan right after generating, instead of being buried under favourites.
   const currentIds = new Set((state.currentResults||[]).map(r => r.id));
@@ -2881,9 +2915,18 @@ async function openMealModal(dateStr, slot){
   document.getElementById('mealServings').value = state.servings;
   document.getElementById('mealCookTwice').checked = false;
   document.getElementById('mealNotes').value = '';
+  document.getElementById('mealLastCookedHint').textContent = '';
   document.getElementById('mealModal').classList.remove('hidden');
 }
 document.getElementById('mealCancelBtn').addEventListener('click', () => document.getElementById('mealModal').classList.add('hidden'));
+document.getElementById('mealRecipeSelect').addEventListener('change', () => {
+  const hint = document.getElementById('mealLastCookedHint');
+  const cooked = mealRecipeLookup[document.getElementById('mealRecipeSelect').value];
+  if(!cooked){ hint.textContent = ''; return; }
+  const days = Math.round((Date.now() - new Date(cooked.lastCookedAt)) / 86400000);
+  const when = days <= 0 ? 'today' : days === 1 ? 'yesterday' : `${days} days ago`;
+  hint.textContent = `Cooked ${cooked.timesCooked}× before, last ${when} — worth mixing it up?`;
+});
 document.getElementById('mealSaveBtn').addEventListener('click', async () => {
   if(!mealModalContext) return;
   const plan = await ensurePlanRow();
