@@ -32,7 +32,8 @@
   .user-chip button{background:none; border:1px solid var(--line); color:var(--text-dim); border-radius:6px; padding:5px 10px; cursor:pointer; font-size:12px;}
   .user-chip button:hover{color:var(--text); border-color:var(--saffron-dim);}
 
-  .tabs{display:flex; gap:2px; margin:10px 0 24px; border-bottom:1px solid var(--line); max-width:820px; margin-left:auto; margin-right:auto; padding:0 20px;}
+  .tabs{display:flex; gap:2px; margin:10px auto 24px; border-bottom:1px solid var(--line); max-width:820px; padding:0 20px; overflow-x:auto; scrollbar-width:thin;}
+  .tabs button{flex:0 0 auto;}
   .tabs button{background:none; border:none; color:var(--text-dim); font-family:'IBM Plex Mono',monospace; font-size:12px; text-transform:uppercase; letter-spacing:0.06em; padding:10px 16px 12px; cursor:pointer; position:relative;}
   .tabs button.active{color:var(--saffron);}
   .tabs button.active::after{content:""; position:absolute; left:0; right:0; bottom:-1px; height:2px; background:var(--saffron);}
@@ -241,13 +242,13 @@
     <div class="user-chip"><span id="userEmail"></span><button id="signOutBtn" type="button">Sign out</button></div>
   </header>
 
-  <nav class="tabs">
-    <button data-tab="recipes" class="active">New recipes</button>
-    <button data-tab="favourites">My Cookbook</button>
-    <button data-tab="koskas">Koskas</button>
-    <button data-tab="plan">Meal plan</button>
-    <button data-tab="shopping">Shopping</button>
-    <button data-tab="profile">Profile &amp; shops</button>
+  <nav class="tabs" role="tablist" aria-label="Main sections">
+    <button data-tab="recipes" class="active" role="tab" aria-selected="true">New recipes</button>
+    <button data-tab="favourites" role="tab" aria-label="Favourites" aria-selected="false">My Cookbook</button>
+    <button data-tab="koskas" role="tab" aria-selected="false">Koskas</button>
+    <button data-tab="plan" role="tab" aria-selected="false">Meal plan</button>
+    <button data-tab="shopping" role="tab" aria-selected="false">Shopping</button>
+    <button data-tab="profile" role="tab" aria-selected="false">Profile &amp; shops</button>
   </nav>
 
   <div class="wrap">
@@ -1062,13 +1063,21 @@ async function saveIngredientPrice(name, unit, price){
 // ---------------- TABS ----------------
 document.querySelectorAll('.tabs button').forEach(btn => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tabs button').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-selected','false'); });
     btn.classList.add('active');
+    btn.setAttribute('aria-selected','true');
     ['recipes','favourites','koskas','plan','shopping','profile'].forEach(t => document.getElementById('tab'+t[0].toUpperCase()+t.slice(1)).classList.toggle('hidden', t !== btn.dataset.tab));
     if(btn.dataset.tab === 'favourites') loadFavourites();
     if(btn.dataset.tab === 'koskas'){ loadPantry(); loadLeftovers(); }
     if(btn.dataset.tab === 'plan') loadMealPlan();
     if(btn.dataset.tab === 'shopping') loadShoppingLists();
+  });
+  btn.addEventListener('keydown', e => {
+    if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key)) return;
+    e.preventDefault();
+    const tabs=[...document.querySelectorAll('.tabs [role="tab"]')], current=tabs.indexOf(btn);
+    const next=e.key==='Home'?0:e.key==='End'?tabs.length-1:(current+(e.key==='ArrowRight'?1:-1)+tabs.length)%tabs.length;
+    tabs[next].focus(); tabs[next].click(); tabs[next].scrollIntoView({block:'nearest',inline:'nearest'});
   });
 });
 
