@@ -186,6 +186,17 @@
   .qf-chip{border:1px solid var(--line); background:var(--card-raised); color:var(--text-dim); padding:4px 10px; border-radius:999px; font-size:12px; cursor:pointer;}
   .qf-chip:hover{border-color:var(--saffron-dim);}
   .qf-chip.on{background:var(--saffron); border-color:var(--saffron); color:#1F2421; font-weight:600;}
+  .cookbook-tools{margin-top:16px; align-items:center;}
+  .cookbook-tools select{width:auto; min-width:150px;}
+  .cookbook-card{position:relative;}
+  .cookbook-badges{display:flex; flex-wrap:wrap; gap:6px; margin:9px 0;}
+  .cookbook-badge{font:11px 'IBM Plex Mono',monospace; padding:4px 7px; border:1px solid var(--line); border-radius:20px; color:var(--text-dim);}
+  .cookbook-comment{padding:10px 12px; background:var(--card-raised); border-left:3px solid var(--saffron); margin:9px 0; font-size:13px;}
+  .cookbook-photo{width:100%; max-height:260px; object-fit:cover; border-radius:10px; margin-top:10px;}
+  .stat-tile{padding:10px 14px; border:1px solid var(--line); border-radius:10px; min-width:100px;}
+  .stat-tile b{display:block; font-size:20px;}
+  dialog{border:1px solid var(--line); border-radius:var(--radius); background:var(--card); color:var(--text); padding:24px; max-width:620px; width:calc(100% - 32px);}
+  dialog::backdrop{background:rgba(0,0,0,.6);}
 
   .sl-category-label{font-family:'IBM Plex Mono', monospace; font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--saffron); margin:14px 0 6px; border-top:1px solid var(--line); padding-top:10px;}
   .sl-category-label:first-child{border-top:none; margin-top:0; padding-top:0;}
@@ -232,7 +243,7 @@
 
   <nav class="tabs">
     <button data-tab="recipes" class="active">New recipes</button>
-    <button data-tab="favourites">Favourites</button>
+    <button data-tab="favourites">My Cookbook</button>
     <button data-tab="koskas">Koskas</button>
     <button data-tab="plan">Meal plan</button>
     <button data-tab="shopping">Shopping</button>
@@ -287,6 +298,12 @@
       </section>
 
       <div id="genErrorBox"></div>
+      <section class="panel">
+        <h2>Smart generation mode</h2>
+        <select id="smartGenerationMode">
+          <option value="standard">Best match for my request</option><option value="use_it">Use it or lose it</option><option value="pantry">Pantry-only challenge</option><option value="remix">Remix a favourite</option><option value="forgotten">Something we have not eaten recently</option><option value="everyone">Everyone will like this</option><option value="cheapest">Cheapest possible dinner</option><option value="rescue">20-minute rescue meal</option><option value="batch">Batch-cook Sunday</option><option value="leftovers">Transform leftovers</option>
+        </select>
+      </section>
       <button class="btn block" id="generateBtn" type="button">Generate recipes</button>
 
       <section class="panel hidden" id="loadingPanel">
@@ -355,8 +372,26 @@
       </section>
     </section>
 
-    <!-- TAB: FAVOURITES -->
+    <!-- TAB: SMART COOKBOOK -->
     <section id="tabFavourites" class="hidden">
+      <section class="panel">
+        <div class="row" style="justify-content:space-between; align-items:flex-start;">
+          <div><h2>My Cookbook</h2><div class="sub">Every saved recipe, cook, rating and kitchen note in one place.</div></div>
+          <button class="btn small" id="cookbookSurprise" type="button">Surprise me</button>
+        </div>
+        <div class="row cookbook-tools">
+          <input id="cookbookSearch" type="search" placeholder="Search recipes, comments or ingredients…" style="flex:2; min-width:220px;">
+          <select id="cookbookStatus"><option value="">All recipes</option><option value="cooked">Cooked</option><option value="want_to_try">Want to try</option><option value="make_again">Make again</option><option value="avoid">Avoid next time</option><option value="favourite">Favourites</option></select>
+          <select id="cookbookSort"><option value="recent">Most recent</option><option value="rating">Highest rated</option><option value="cooked">Most cooked</option><option value="fast">Fastest</option><option value="cheap">Cheapest</option><option value="forgotten">Longest since cooked</option></select>
+          <label class="hint"><input id="cookbookPantryOnly" type="checkbox"> Can cook now</label>
+        </div>
+        <div class="row" id="cookbookStats"></div>
+      </section>
+      <section class="panel" id="kitchenDashboard"><h2>This week in your kitchen</h2><div id="kitchenDashboardBody"></div></section>
+      <section class="panel">
+        <div class="row" style="justify-content:space-between;"><h2>Collections</h2><button class="btn ghost small" id="newCollectionBtn" type="button">+ Collection</button></div>
+        <div class="taglist" id="collectionChips"></div>
+      </section>
       <div id="favouritesBody"></div>
     </section>
 
@@ -534,6 +569,7 @@
     <div class="ck-text" id="ckText"></div>
     <div class="ck-timer hidden" id="ckTimer"></div>
     <div class="row" id="ckTimerControls" style="margin-top:16px;"></div>
+    <div class="row" style="margin-top:16px;"><button class="btn ghost small" id="ckReadBtn" type="button">🔊 Read step</button><button class="btn ghost small" id="ckVoiceBtn" type="button">🎙 Voice control</button></div>
   </div>
   <div class="ck-nav">
     <button class="btn ghost" id="ckPrevBtn" type="button">Back</button>
@@ -611,6 +647,32 @@
     </div>
   </div>
 </div>
+
+<dialog id="cookLogDialog">
+  <form method="dialog" id="cookLogForm">
+    <h3 id="cookLogTitle">Log this cook</h3>
+    <div class="row"><label>Servings made <input id="cookServingsMade" type="number" min="1" step="1" value="2"></label><label>Servings eaten <input id="cookServingsEaten" type="number" min="0" step="1" value="2"></label></div>
+    <div class="row"><label>Actual minutes <input id="cookActualMinutes" type="number" min="0"></label><label>Actual cost € <input id="cookActualCost" type="number" min="0" step=".01"></label></div>
+    <label class="field-label">How was it?</label><div class="row" id="cookStars"></div>
+    <label class="field-label">What would you change?</label><textarea id="cookComment" placeholder="e.g. double the sauce next time"></textarea>
+    <label class="field-label">Substitutions</label><input id="cookSubstitutions" type="text" placeholder="e.g. yoghurt instead of cream">
+    <div class="row" style="margin-top:12px;"><label><input id="cookAgain" type="checkbox"> Make again</label><label><input id="cookTimeAccurate" type="checkbox"> Time was accurate</label><label><input id="cookPortionsEnough" type="checkbox"> Portions were enough</label></div>
+    <label class="field-label">Optional photo (max 5 MB)</label><input id="cookPhoto" type="file" accept="image/jpeg,image/png,image/webp">
+    <div class="row" style="margin-top:16px;"><button class="btn" id="saveCookLog" type="button">Save cook</button><button class="btn ghost" value="cancel">Cancel</button></div>
+  </form>
+</dialog>
+
+<dialog id="versionDialog">
+  <form method="dialog">
+    <h3>Save our version</h3>
+    <label class="field-label">Version name</label><input id="versionName" placeholder="e.g. Armand's extra-garlic version">
+    <label class="field-label">Ingredients (one per line)</label><textarea id="versionIngredients" rows="8"></textarea>
+    <label class="field-label">Steps (one per line)</label><textarea id="versionSteps" rows="8"></textarea>
+    <label class="field-label">Notes</label><textarea id="versionNotes"></textarea>
+    <label><input id="versionPreferred" type="checkbox"> Use as our preferred version</label>
+    <div class="row" style="margin-top:16px;"><button class="btn" id="saveVersion" type="button">Save version</button><button class="btn ghost" value="cancel">Cancel</button></div>
+  </form>
+</dialog>
 
 <div id="printArea" class="hidden"></div>
 
@@ -1204,6 +1266,10 @@ function buildPrompt(preferenceSummary){
   const allergyList = household.allergies || [];
   const dietList = household.diets || [];
   const shopList = shops.filter(s => s.selected).map(s => s.name);
+  const mode = document.getElementById('smartGenerationMode').value;
+  const modeBrief = {
+    standard:'Choose the best overall match.', use_it:'Aggressively prioritise ingredients expiring soon and minimise waste.', pantry:'Use only pantry/on-hand ingredients except basic salt, pepper, oil and water.', remix:'Preserve the qualities of a highly rated past dish but change its cuisine, protein or format.', forgotten:'Avoid recent meals and favour a style not cooked recently.', everyone:'Optimise for overlapping household ratings and avoid polarising past dishes.', cheapest:'Minimise total cost and cost per serving.', rescue:'Every recipe must realistically take 20 minutes or less.', batch:'Make freezer-friendly large-batch recipes with reheating guidance.', leftovers:'Transform logged leftovers into distinctly new meals.'
+  }[mode];
 
   return `You are a home cooking assistant with memory of this person's past ratings. Generate ${state.recipeCount} distinct recipe(s). Respond with ONLY valid JSON, no markdown fences, matching exactly this schema:
 
@@ -1223,6 +1289,7 @@ function buildPrompt(preferenceSummary){
 }
 
 Brief:
+- Smart mode: ${modeBrief}
 - What they want: ${cuisineList.length ? cuisineList.join(', ') : 'no specific type, use your judgement'}
 - Must strictly avoid: ${allergyList.length ? allergyList.join(', ') : 'none stated'}
 - Diet: ${dietList.length ? dietList.join(', ') : 'none stated'}
@@ -1791,36 +1858,126 @@ function openLeftoverModal(recipe){
 }
 document.querySelectorAll('#leftoverChips .chip').forEach(chip => {
   chip.addEventListener('click', async () => {
-    if(leftoverRecipeContext){
+    const cookedRecipe = leftoverRecipeContext;
+    if(cookedRecipe){
       await safeDb(supabase.from('leftovers').insert({
-        household_id: household.id, recipe_id: leftoverRecipeContext.id || null,
-        recipe_title: leftoverRecipeContext.title, amount: chip.dataset.amt
+        household_id: household.id, recipe_id: cookedRecipe.id || null,
+        recipe_title: cookedRecipe.title, amount: chip.dataset.amt
       }), 'Could not log the leftovers');
     }
     document.getElementById('leftoverModal').classList.add('hidden');
     loadLeftovers();
+    if(cookedRecipe?.id) openCookLog(cookedRecipe);
   });
 });
-document.getElementById('skipLeftoverBtn').addEventListener('click', () => document.getElementById('leftoverModal').classList.add('hidden'));
+document.getElementById('skipLeftoverBtn').addEventListener('click', () => { const cookedRecipe=leftoverRecipeContext; document.getElementById('leftoverModal').classList.add('hidden'); if(cookedRecipe?.id)openCookLog(cookedRecipe); });
 
 
 async function loadFavourites(){
   const body = document.getElementById('favouritesBody');
-  const { data, error } = await safeDb(supabase.from('recipes').select('*').eq('household_id', household.id).eq('is_favourite', true).order('generated_at', {ascending:false}), 'Could not load favourites');
+  const { data, error } = await safeDb(supabase.from('recipes').select('*, recipe_ratings(*), recipe_cooks(*), recipe_versions(*), recipe_collection_items(collection_id)').eq('household_id', household.id).order('generated_at', {ascending:false}).limit(500), 'Could not load your cookbook');
   if(error) return;
-  body.innerHTML = '';
-  if(!data || !data.length){ body.appendChild(el('div', {class:'panel', text:'No favourites saved yet.'})); return; }
-  await preloadTagsForRecipes(data.map(r => r.id));
-  data.forEach(r => body.appendChild(buildRecipeCard(r, [])));
+  cookbookRecipes = data || [];
+  await Promise.all([preloadTagsForRecipes(cookbookRecipes.map(r => r.id)), loadCollections()]);
+  renderCookbook(); renderKitchenDashboard();
 }
+function escapeHtml(value){ return String(value??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
+
+let cookbookRecipes = [], cookbookCollection = '', cookLogTarget = null, versionTarget = null;
+function myRating(r){ return (r.recipe_ratings||[]).find(x => x.profile_id === session.user.id) || {}; }
+function cooksFor(r){ return (r.recipe_cooks||[]).sort((a,b) => new Date(b.cooked_at)-new Date(a.cooked_at)); }
+function avgRating(r){ const xs=(r.recipe_ratings||[]).map(x=>x.taste).filter(Boolean); return xs.length ? xs.reduce((a,b)=>a+b,0)/xs.length : 0; }
+function canCookNow(r){ return (r.ingredients||[]).every(i => pantryItems.some(p => p.quantity > 0 && namesMatch(i.item,p.name))); }
+function euroCost(r){ return computeCost(r.ingredients||[]).total; }
+
+function renderCookbook(){
+  const body=document.getElementById('favouritesBody'); body.innerHTML='';
+  const q=document.getElementById('cookbookSearch').value.trim().toLowerCase();
+  const status=document.getElementById('cookbookStatus').value;
+  const pantryOnly=document.getElementById('cookbookPantryOnly').checked;
+  let rows=cookbookRecipes.filter(r => {
+    const rating=myRating(r), hay=[r.title,r.description,r.cuisine,rating.comment,...(r.ingredients||[]).map(i=>i.item),...cooksFor(r).map(c=>c.comment)].filter(Boolean).join(' ').toLowerCase();
+    return (!q || hay.includes(q)) && (!status || (status==='favourite' ? r.is_favourite : r.library_status===status)) && (!pantryOnly || canCookNow(r)) && (!cookbookCollection || (r.recipe_collection_items||[]).some(x=>x.collection_id===cookbookCollection));
+  });
+  const sort=document.getElementById('cookbookSort').value;
+  rows.sort((a,b)=> sort==='rating' ? avgRating(b)-avgRating(a) : sort==='cooked' ? cooksFor(b).length-cooksFor(a).length : sort==='fast' ? (a.total_time_minutes||999)-(b.total_time_minutes||999) : sort==='cheap' ? euroCost(a)-euroCost(b) : sort==='forgotten' ? ((cooksFor(a)[0]?.cooked_at||'')>(cooksFor(b)[0]?.cooked_at||'')?1:-1) : new Date(b.generated_at)-new Date(a.generated_at));
+  document.getElementById('cookbookStats').innerHTML=`<span class="stat-tile"><b>${cookbookRecipes.length}</b>recipes</span><span class="stat-tile"><b>${cookbookRecipes.reduce((n,r)=>n+cooksFor(r).length,0)}</b>cooks</span><span class="stat-tile"><b>${cookbookRecipes.filter(r=>r.library_status==='make_again').length}</b>make again</span><span class="stat-tile"><b>${rows.length}</b>showing</span>`;
+  if(!rows.length){ body.appendChild(el('div',{class:'panel hint',text:'No recipes match these filters.'})); return; }
+  rows.forEach(r=>body.appendChild(buildCookbookCard(r)));
+  hydrateCookPhotos();
+}
+
+function buildCookbookCard(r){
+  const card=buildRecipeCard(r,[]); card.classList.add('cookbook-card');
+  const top=card.querySelector('.rc-top'), rating=myRating(r), cooks=cooksFor(r), latest=cooks[0];
+  const badges=el('div',{class:'cookbook-badges'});
+  badges.appendChild(el('span',{class:'cookbook-badge',text:avgRating(r)?`★ ${avgRating(r).toFixed(1)} household`:'Not rated'}));
+  badges.appendChild(el('span',{class:'cookbook-badge',text:`Cooked ${cooks.length}×`}));
+  if(latest) badges.appendChild(el('span',{class:'cookbook-badge',text:'Last '+new Date(latest.cooked_at).toLocaleDateString('en-IE')}));
+  if(canCookNow(r)) badges.appendChild(el('span',{class:'cookbook-badge',text:'✓ Pantry ready'}));
+  top.insertBefore(badges,top.querySelector('.rc-actions'));
+  if(rating.comment) top.insertBefore(el('div',{class:'cookbook-comment',text:'Your note: '+rating.comment}),top.querySelector('.rc-actions'));
+  if(latest?.comment) top.insertBefore(el('div',{class:'cookbook-comment',text:'Latest cook: '+latest.comment}),top.querySelector('.rc-actions'));
+  const actions=top.querySelector('.rc-actions');
+  const status=el('select',{title:'Cookbook status'}); ['want_to_try','cooked','make_again','avoid'].forEach(v=>status.appendChild(el('option',{value:v,text:v.replaceAll('_',' ')}))); status.value=r.library_status||'want_to_try';
+  status.addEventListener('change',async()=>{ const {error}=await safeDb(supabase.from('recipes').update({library_status:status.value}).eq('id',r.id),'Could not update cookbook status'); if(!error){r.library_status=status.value;renderCookbook();}}); actions.appendChild(status);
+  const log=el('button',{class:'btn small',type:'button',text:cooks.length?'Log another cook':'Log first cook'}); log.addEventListener('click',()=>openCookLog(r)); actions.appendChild(log);
+  const again=el('button',{class:'btn ghost small',type:'button',text:'Cook again'}); again.addEventListener('click',()=>smartCookAgain(r)); actions.appendChild(again);
+  const version=el('button',{class:'btn ghost small',type:'button',text:'Our version'}); version.addEventListener('click',()=>openVersion(r)); actions.appendChild(version);
+  const share=el('button',{class:'btn ghost small',type:'button',text:'Share'}); share.addEventListener('click',()=>shareRecipe(r)); actions.appendChild(share);
+  const collect=el('button',{class:'btn ghost small',type:'button',text:'Add to collection'}); collect.addEventListener('click',()=>addToCollection(r)); actions.appendChild(collect);
+  if(cooks.length){ const diary=el('details'); diary.appendChild(el('summary',{text:`Cooking diary (${cooks.length})`})); cooks.forEach(c=>{diary.appendChild(el('div',{class:'cookbook-comment',text:`${new Date(c.cooked_at).toLocaleDateString('en-IE')} · ${c.taste?'★'.repeat(c.taste):'unrated'} · ${c.comment||'No note'}${c.substitutions?' · Swapped: '+c.substitutions:''}`}));if(c.photo_url){const img=el('img',{class:'cookbook-photo',alt:'Photo from this cook'});img.dataset.storagePath=c.photo_url;diary.appendChild(img);}}); top.appendChild(diary); }
+  return card;
+}
+
+async function hydrateCookPhotos(){for(const img of document.querySelectorAll('img[data-storage-path]')){const {data}=await supabase.storage.from('recipe-photos').createSignedUrl(img.dataset.storagePath,900);if(data?.signedUrl)img.src=data.signedUrl;}}
+
+['cookbookSearch','cookbookStatus','cookbookSort','cookbookPantryOnly'].forEach(id=>document.getElementById(id).addEventListener(id==='cookbookSearch'?'input':'change',renderCookbook));
+document.getElementById('cookbookSurprise').addEventListener('click',()=>{ const pool=cookbookRecipes.filter(r=>r.library_status!=='avoid'); if(pool.length) smartCookAgain(pool[Math.floor(Math.random()*pool.length)]); });
+
+async function smartCookAgain(r){
+  const list=await ensureDraftList('Cook again: '+r.title,'recipe'); if(!list)return;
+  const missing=(r.ingredients||[]).map(i=>ingredientToListItem(i,r.id)).filter(i=>i.status!=='already_have');
+  if(missing.length) await addItemsToList(list,missing);
+  showToast(missing.length?`${missing.length} missing ingredient(s) added to ${list.title}`:'Everything is already in Koskas');
+  startCooking(r);
+}
+
+async function shareRecipe(r){
+  const text=`${r.title}\n\nIngredients\n${(r.ingredients||[]).map(i=>`• ${i.amount||''} ${i.unit||''} ${i.item}`.trim()).join('\n')}\n\nMethod\n${(r.steps||[]).map((s,i)=>`${i+1}. ${typeof s==='string'?s:s.text}`).join('\n')}\n\nOur tip: ${myRating(r).comment||'No private notes included.'}`;
+  if(navigator.share){ await navigator.share({title:r.title,text}); } else { await navigator.clipboard.writeText(text); showToast('Recipe copied to clipboard'); }
+}
+
+function openCookLog(r){ cookLogTarget=r; document.getElementById('cookLogTitle').textContent='Log '+r.title; document.getElementById('cookServingsMade').value=r.servings||2; document.getElementById('cookServingsEaten').value=r.servings||2; const stars=document.getElementById('cookStars'); stars.innerHTML=''; for(let i=1;i<=5;i++){const b=el('button',{class:'chip',type:'button',text:'★ '+i});b.addEventListener('click',()=>{cookLogTarget._cookTaste=i;[...stars.children].forEach((x,j)=>x.classList.toggle('selected',j<i));});stars.appendChild(b);} document.getElementById('cookLogDialog').showModal(); }
+document.getElementById('saveCookLog').addEventListener('click',async()=>{
+  const made=Number(document.getElementById('cookServingsMade').value)||null,eaten=Number(document.getElementById('cookServingsEaten').value)||0,file=document.getElementById('cookPhoto').files[0]; let photo=null;
+  if(file){ const path=`${household.id}/${session.user.id}/${crypto.randomUUID()}-${file.name.replace(/[^a-z0-9.]/gi,'-')}`; const {error}=await supabase.storage.from('recipe-photos').upload(path,file); if(error){showToast('Photo upload failed: '+error.message,true);return;} photo=path; }
+  const row={recipe_id:cookLogTarget.id,household_id:household.id,profile_id:session.user.id,servings_made:made,servings_eaten:eaten,taste:cookLogTarget._cookTaste||null,actual_minutes:Number(document.getElementById('cookActualMinutes').value)||null,actual_cost:Number(document.getElementById('cookActualCost').value)||null,comment:document.getElementById('cookComment').value.trim()||null,substitutions:document.getElementById('cookSubstitutions').value.trim()||null,would_make_again:document.getElementById('cookAgain').checked,stated_time_accurate:document.getElementById('cookTimeAccurate').checked,portions_enough:document.getElementById('cookPortionsEnough').checked,photo_url:photo};
+  const {data,error}=await safeDb(supabase.from('recipe_cooks').insert(row).select().single(),'Could not save cooking diary'); if(error)return;
+  await supabase.from('recipes').update({library_status:row.would_make_again?'make_again':'cooked'}).eq('id',cookLogTarget.id);
+  if(made>eaten) await safeDb(supabase.from('leftovers').insert({household_id:household.id,recipe_id:cookLogTarget.id,recipe_title:cookLogTarget.title,amount:`${made-eaten} serving(s)`}),'Could not log leftover portions');
+  document.getElementById('cookLogDialog').close(); showToast('Cook saved to your diary'); await loadFavourites(); loadLeftovers();
+});
+
+function openVersion(r){versionTarget=r;document.getElementById('versionName').value='Our '+r.title;document.getElementById('versionIngredients').value=(r.ingredients||[]).map(i=>[i.amount,i.unit,i.item].filter(Boolean).join(' ')).join('\n');document.getElementById('versionSteps').value=(r.steps||[]).map(s=>typeof s==='string'?s:s.text).join('\n');document.getElementById('versionDialog').showModal();}
+document.getElementById('saveVersion').addEventListener('click',async()=>{const name=document.getElementById('versionName').value.trim();if(!name)return;const ingredients=document.getElementById('versionIngredients').value.split('\n').filter(Boolean).map(item=>({item})),steps=document.getElementById('versionSteps').value.split('\n').filter(Boolean);if(document.getElementById('versionPreferred').checked)await supabase.from('recipe_versions').update({is_preferred:false}).eq('recipe_id',versionTarget.id);const {error}=await safeDb(supabase.from('recipe_versions').insert({recipe_id:versionTarget.id,household_id:household.id,created_by:session.user.id,name,ingredients,steps,servings:versionTarget.servings,notes:document.getElementById('versionNotes').value.trim()||null,is_preferred:document.getElementById('versionPreferred').checked}),'Could not save recipe version');if(!error){document.getElementById('versionDialog').close();showToast('Recipe version saved');loadFavourites();}});
+
+let cookbookCollections=[];
+async function loadCollections(){const {data}=await safeDb(supabase.from('recipe_collections').select('*').eq('household_id',household.id).order('name'),'Could not load collections');cookbookCollections=data||[];const wrap=document.getElementById('collectionChips');wrap.innerHTML='';const all=el('button',{class:'chip'+(!cookbookCollection?' selected':''),type:'button',text:'All'});all.addEventListener('click',()=>{cookbookCollection='';loadCollections();renderCookbook();});wrap.appendChild(all);cookbookCollections.forEach(c=>{const b=el('button',{class:'chip'+(cookbookCollection===c.id?' selected':''),type:'button',text:(c.emoji||'📚')+' '+c.name});b.addEventListener('click',()=>{cookbookCollection=c.id;loadCollections();renderCookbook();});wrap.appendChild(b);});}
+document.getElementById('newCollectionBtn').addEventListener('click',async()=>{const name=prompt('Collection name');if(!name)return;const {error}=await safeDb(supabase.from('recipe_collections').insert({household_id:household.id,created_by:session.user.id,name}),'Could not create collection');if(!error)loadCollections();});
+async function addToCollection(r){if(!cookbookCollections.length){showToast('Create a collection first',true);return;}const name=prompt('Add to which collection?\n'+cookbookCollections.map((c,i)=>`${i+1}. ${c.name}`).join('\n'));const idx=Number(name)-1,c=cookbookCollections[idx]||cookbookCollections.find(x=>x.name.toLowerCase()===String(name).toLowerCase());if(!c)return;const {error}=await safeDb(supabase.from('recipe_collection_items').upsert({collection_id:c.id,recipe_id:r.id,added_by:session.user.id}),'Could not add to collection');if(!error){showToast('Added to '+c.name);loadFavourites();}}
+
+function renderKitchenDashboard(){const wrap=document.getElementById('kitchenDashboardBody'),exp=pantryItems.filter(i=>{const d=daysUntil(i.expiry_date);return d!==null&&d>=0&&d<=3;}),low=lowStockItems(),allCooks=cookbookRecipes.flatMap(r=>cooksFor(r)),five=cookbookRecipes.filter(r=>avgRating(r)>=4.5).sort((a,b)=>(cooksFor(a)[0]?.cooked_at||'').localeCompare(cooksFor(b)[0]?.cooked_at||''))[0],cost=allCooks.filter(c=>c.actual_cost!=null).slice(0,7).reduce((n,c)=>n+Number(c.actual_cost),0),badges=[allCooks.length>=1?'First cook logged':null,allCooks.length>=20?'20-dinner explorer':null,exp.length===0?'Zero-waste watch':null,cookbookRecipes.filter(r=>canCookNow(r)).length>=5?'Pantry pro':null].filter(Boolean);wrap.innerHTML=`<div class="row"><span class="stat-tile"><b>${exp.length}</b>expiring soon</span><span class="stat-tile"><b>${low.length}</b>low stock</span><span class="stat-tile"><b>€${cost.toFixed(2)}</b>recent actual cost</span></div>${five?`<p class="hint">Rediscover a household favourite: <b>${escapeHtml(five.title)}</b> (${avgRating(five).toFixed(1)}★).</p>`:''}<p class="hint">${cookbookRecipes.filter(r=>canCookNow(r)).length} saved recipe(s) can be made entirely from Koskas right now.</p><div class="cookbook-badges">${badges.map(x=>`<span class="cookbook-badge">🏅 ${x}</span>`).join('')}</div>`;}
 
 // ---------------- RATING MODAL ----------------
 let ratingTarget = null;
 const RATING_CATS = [['taste','Taste'],['convenience','Convenience'],['cost','Cost'],['serving_size','Serving size']];
-function openRatingModal(recipe){
+async function openRatingModal(recipe){
   ratingTarget = recipe;
   const wrap = document.getElementById('starRows'); wrap.innerHTML = '';
-  ratingTarget._ratings = {};
+  let existing=(recipe.recipe_ratings||[]).find(x=>x.profile_id===session.user.id);
+  if(!existing){ const {data}=await safeDb(supabase.from('recipe_ratings').select('*').eq('recipe_id',recipe.id).eq('profile_id',session.user.id).maybeSingle(),'Could not load your rating'); existing=data||{}; }
+  ratingTarget._ratings = {...existing};
   RATING_CATS.forEach(([key,label]) => {
     const row = el('div', {class:'star-row'});
     row.appendChild(el('div', {class:'cat', text:label}));
@@ -1831,6 +1988,7 @@ function openRatingModal(recipe){
         ratingTarget._ratings[key] = i;
         [...stars.children].forEach((el2,idx) => el2.classList.toggle('on', idx < i));
       });
+      s.classList.toggle('on', i <= (existing[key]||0));
       stars.appendChild(s);
     }
     row.appendChild(stars);
@@ -1838,7 +1996,7 @@ function openRatingModal(recipe){
   });
   const tagWrap = document.getElementById('ratingQuickTags'); tagWrap.innerHTML = '';
   tagWrap.appendChild(buildQuickTagChips(recipe.id));
-  document.getElementById('ratingComment').value = '';
+  document.getElementById('ratingComment').value = existing.comment||'';
   document.getElementById('ratingModal').classList.remove('hidden');
 }
 document.getElementById('cancelRatingBtn').addEventListener('click', () => document.getElementById('ratingModal').classList.add('hidden'));
@@ -1876,8 +2034,9 @@ function printRecipe(r){
 }
 
 // ---------------- COOKING MODE ----------------
-let wakeLock = null, ckSteps = [], ckIndex = 0, ckTimerInterval = null;
+let wakeLock = null, ckSteps = [], ckIndex = 0, ckTimerInterval = null, ckRecipe = null;
 async function startCooking(r){
+  ckRecipe = r;
   ckSteps = (r.steps||[]).map(s => typeof s === 'string' ? {text:s, timerSeconds:null} : s);
   ckIndex = 0;
   document.getElementById('ckTitle').textContent = r.title||'';
@@ -1918,13 +2077,18 @@ function renderCookingStep(){
 }
 document.getElementById('ckPrevBtn').addEventListener('click', () => { if(ckIndex>0){ ckIndex--; renderCookingStep(); }});
 document.getElementById('ckNextBtn').addEventListener('click', () => {
-  if(ckIndex < ckSteps.length-1){ ckIndex++; renderCookingStep(); } else { exitCooking(); }
+  if(ckIndex < ckSteps.length-1){ ckIndex++; renderCookingStep(); } else { const finished=ckRecipe; exitCooking().then(()=>{if(finished?.id)openCookLog(finished);}); }
 });
 document.getElementById('exitCookingBtn').addEventListener('click', exitCooking);
+document.getElementById('ckReadBtn').addEventListener('click',()=>{speechSynthesis.cancel();speechSynthesis.speak(new SpeechSynthesisUtterance(document.getElementById('ckText').textContent));});
+let ckRecognition=null;
+document.getElementById('ckVoiceBtn').addEventListener('click',()=>{const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){showToast('Voice control is not supported in this browser',true);return;}ckRecognition=new SR();ckRecognition.continuous=true;ckRecognition.onresult=e=>{const t=e.results[e.results.length-1][0].transcript.toLowerCase();if(t.includes('next'))document.getElementById('ckNextBtn').click();else if(t.includes('back')||t.includes('previous'))document.getElementById('ckPrevBtn').click();else if(t.includes('read'))document.getElementById('ckReadBtn').click();else if(t.includes('timer'))document.querySelector('#ckTimerControls button')?.click();};ckRecognition.start();showToast('Listening for next, back, read or timer');});
 async function exitCooking(){
   clearInterval(ckTimerInterval);
   if(wakeLock){ try{ await wakeLock.release(); }catch(e){} wakeLock = null; }
   document.getElementById('cookingOverlay').classList.add('hidden');
+  if(ckRecognition){ckRecognition.stop();ckRecognition=null;} speechSynthesis.cancel();
+  ckRecipe = null;
 }
 document.addEventListener('visibilitychange', async () => {
   if(document.visibilityState === 'visible' && !document.getElementById('cookingOverlay').classList.contains('hidden') && 'wakeLock' in navigator){

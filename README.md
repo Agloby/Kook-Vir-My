@@ -25,6 +25,21 @@ supabase/
 netlify.toml             publish dir + service-worker cache headers
 ```
 
+## Smart cookbook
+
+**My Cookbook** contains every saved recipe rather than favourites alone. It supports
+search/filter/sort, household and personal ratings, editable comments and tags,
+collections, personal recipe versions, sharing, pantry-aware “cook again”, generation
+modes, and a weekly kitchen dashboard. Each completed cook is stored separately in
+`recipe_cooks`, preserving its date, ratings, notes, substitutions, portions, actual
+time/cost and optional private photo. Completing a recipe can automatically record
+leftover portions. Cooking mode includes timers, screen wake lock, read-aloud and
+browser-supported voice commands.
+
+Apply `20260716120000_smart_cookbook_suite.sql` before deploying this frontend. Recipe
+photos use the private `recipe-photos` Supabase Storage bucket created by the migration;
+the bucket has a 5 MB object limit and accepts JPEG, PNG and WebP files.
+
 ## Deploying
 
 **Frontend:** connect this repo to Netlify (or drag `netlify-site/` into Netlify Drop).
