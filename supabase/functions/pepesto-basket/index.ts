@@ -17,9 +17,16 @@ const PEPESTO_ONESHOT_ENDPOINT = "https://s.pepesto.com/api/oneshot";
 // but allow enough time for the slower Irish retailer response to complete.
 const REQUEST_TIMEOUT_MS = 45_000;
 
+// Only this project's own Netlify site (production alias + deploy/branch previews) -
+// origin.endsWith(".netlify.app") would accept any Netlify-hosted site, not just this one.
+const NETLIFY_SITE_RE = /^https:\/\/([a-z0-9-]+--)?kookvirmy\.netlify\.app$/i;
+// Each comparison is a billable Pepesto call per retailer; this only guards against rapid
+// repeat clicks on the same list, it is not a full per-household rate limiter.
+const COMPARE_COOLDOWN_MS = 10_000;
+
 function corsHeaders(req: Request) {
   const origin = req.headers.get("origin") || "";
-  const allowed = ALLOWED_ORIGINS.includes(origin) || origin.endsWith(".netlify.app") ||
+  const allowed = ALLOWED_ORIGINS.includes(origin) || NETLIFY_SITE_RE.test(origin) ||
     origin === "http://localhost:8888" || origin === "http://localhost:8000";
   return {
     "Access-Control-Allow-Origin": allowed ? origin : ALLOWED_ORIGINS[0],
@@ -112,11 +119,18 @@ Deno.serve(async (req: Request) => {
     if (authError || !authData.user) return json(req, { error: "Authentication required." }, 401);
 
     const { data: list, error: listError } = await client.from("shopping_lists")
-      .select("id, household_id").eq("id", shoppingListId).maybeSingle();
+      .select("id, household_id, pepesto_last_compared_at").eq("id", shoppingListId).maybeSingle();
     if (listError || !list) return json(req, { error: "Shopping list not found." }, 404);
     const { data: membership } = await client.from("household_members").select("household_id")
       .eq("household_id", list.household_id).eq("user_id", authData.user.id).maybeSingle();
     if (!membership) return json(req, { error: "You do not have access to this shopping list." }, 403);
+
+    if (list.pepesto_last_compared_at) {
+      const elapsedMs = Date.now() - new Date(list.pepesto_last_compared_at as string).getTime();
+      if (elapsedMs < COMPARE_COOLDOWN_MS) {
+        return json(req, { error: "Please wait a few seconds before comparing this list again." }, 429);
+      }
+    }
 
     const { data: items, error: itemsError } = await client.from("shopping_list_items")
       .select("item_name, quantity, unit, quantity_text, notes, status")
@@ -139,6 +153,8 @@ Deno.serve(async (req: Request) => {
       });
     }
     const upstream = await callPepesto(apiKey, contentText, retailerDomain);
+    await client.from("shopping_lists").update({ pepesto_last_compared_at: new Date().toISOString() })
+      .eq("id", list.id);
     return json(req, normalisePepestoResponse(upstream, retailerDomain));
   } catch (error) {
     const message = error instanceof DOMException && error.name === "AbortError"

@@ -10,6 +10,8 @@ Domain: `kookvirjou.com`. Static frontend on Netlify, backend on Supabase (proje
 netlify-site/            static site (publish directory — no build step)
   index.html             the whole app (vanilla HTML/CSS/JS)
   pepesto-helpers.js     testable basket-ranking and request-control helpers
+  recipe-helpers.js      testable ingredient/date/category helpers (normalization,
+                         unit conversion, shopping-list merging, week/date math)
   manifest.webmanifest   PWA manifest
   sw.js                  service worker (app shell only; never caches API data)
   offline.html           offline fallback page
@@ -64,7 +66,7 @@ calls:
 
 ```sh
 deno test supabase/functions/pepesto-basket/helpers_test.ts
-node --test tests/pepesto-frontend.test.mjs
+node --test tests/pepesto-frontend.test.mjs tests/recipe-helpers.test.mjs
 ```
 
 The integration does not run on page load, tab changes, or item edits. Results

@@ -7,6 +7,7 @@ const SHELL = [
   './',
   './index.html',
   './pepesto-helpers.js',
+  './recipe-helpers.js',
   './offline.html',
   './manifest.webmanifest',
   './icons/icon.svg',
