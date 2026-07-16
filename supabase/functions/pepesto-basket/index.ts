@@ -1,5 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2.110.5";
 import {
   buildPepestoInput,
   isRetailerDomain,
@@ -125,7 +125,7 @@ Deno.serve(async (req: Request) => {
       .eq("household_id", list.household_id).eq("user_id", authData.user.id).maybeSingle();
     if (!membership) return json(req, { error: "You do not have access to this shopping list." }, 403);
 
-    if (list.pepesto_last_compared_at) {
+    if (mode === "compare" && list.pepesto_last_compared_at) {
       const elapsedMs = Date.now() - new Date(list.pepesto_last_compared_at as string).getTime();
       if (elapsedMs < COMPARE_COOLDOWN_MS) {
         return json(req, { error: "Please wait a few seconds before comparing this list again." }, 429);

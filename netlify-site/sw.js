@@ -2,7 +2,7 @@
 // Caches only the static app shell (HTML, manifest, icons, offline page).
 // It deliberately never caches cross-origin requests — Supabase API responses
 // (user data), Google APIs and Open Food Facts always go to the network.
-const CACHE = 'kvj-shell-v6';
+const CACHE = 'kvj-shell-v7';
 const SHELL = [
   './',
   './index.html',
@@ -39,8 +39,10 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(event.request)
         .then(resp => {
-          const copy = resp.clone();
-          caches.open(CACHE).then(c => c.put('./index.html', copy));
+          if (resp.ok && (resp.headers.get('content-type') || '').includes('text/html')) {
+            const copy = resp.clone();
+            caches.open(CACHE).then(c => c.put('./index.html', copy));
+          }
           return resp;
         })
         .catch(() => caches.match('./index.html').then(hit => hit || caches.match('./offline.html')))
