@@ -74,7 +74,7 @@ Deno.serve(async (req: Request) => {
     } finally { clearTimeout(timeout); }
     const data = await anthropicResp.json().catch(() => ({}));
     if (!anthropicResp.ok) return json(req, { error: "Recipe generation is temporarily unavailable." }, 502);
-    await client.rpc("record_usage_event", { p_category: "recipe_ai", p_cost: 0.03, p_metadata: { model: "claude-sonnet-4-6", max_tokens: maxTokens } }).catch(() => {});
+    await client.rpc("record_usage_event", { p_category: "recipe_ai", p_cost: 0.03, p_metadata: { model: "claude-sonnet-4-6", max_tokens: maxTokens } });
     return json(req, data);
   } catch (err) {
     const timedOut = err instanceof DOMException && err.name === "AbortError";
