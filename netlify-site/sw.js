@@ -2,10 +2,15 @@
 // Caches only the static app shell (HTML, manifest, icons, offline page).
 // It deliberately never caches cross-origin requests — Supabase API responses
 // (user data), Google APIs and Open Food Facts always go to the network.
-const CACHE = 'kvj-shell-v7';
+const CACHE = 'kvj-shell-v8';
 const SHELL = [
   './',
   './index.html',
+  './app.js',
+  './styles.css',
+  './account-tools.js',
+  './monitoring.js',
+  './realtime.js',
   './pepesto-helpers.js',
   './recipe-helpers.js',
   './offline.html',

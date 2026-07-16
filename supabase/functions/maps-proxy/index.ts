@@ -27,6 +27,7 @@ Deno.serve(async req => {
       const upstream=await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(body.address)}&key=${key}`);
       const data=await upstream.json(); const loc=data?.results?.[0]?.geometry?.location;
       if(!upstream.ok||data.status!=="OK"||!Number.isFinite(loc?.lat)||!Number.isFinite(loc?.lng)) return json(req,{error:"The address could not be located."},422);
+      await client.rpc("record_usage_event",{p_category:"maps",p_cost:0.005,p_metadata:{action:"geocode"}}).catch(()=>{});
       return json(req,{lat:loc.lat,lon:loc.lng});
     }
     if(body.action === "nearby"){
@@ -35,8 +36,9 @@ Deno.serve(async req => {
       const upstream=await fetch("https://places.googleapis.com/v1/places:searchNearby",{method:"POST",headers:{"Content-Type":"application/json","X-Goog-Api-Key":key,"X-Goog-FieldMask":"places.displayName,places.location,places.primaryType"},body:JSON.stringify({includedTypes:["supermarket","grocery_store"],maxResultCount:20,locationRestriction:{circle:{center:{latitude:lat,longitude:lon},radius:20000}}})});
       if(!upstream.ok) return json(req,{error:"Nearby shops could not be loaded."},502);
       const data=await upstream.json();
+      await client.rpc("record_usage_event",{p_category:"maps",p_cost:0.01,p_metadata:{action:"nearby"}}).catch(()=>{});
       return json(req,{places:(data.places||[]).map((p:Record<string,any>)=>({name:p.displayName?.text||"Shop",lat:p.location?.latitude,lon:p.location?.longitude})).filter((p:Record<string,unknown>)=>Number.isFinite(p.lat)&&Number.isFinite(p.lon))});
     }
     return json(req,{error:"Invalid map action."},400);
-  }catch{return json(req,{error:"Map request failed."},502);}
+  }catch(error){console.error(JSON.stringify({event:"maps_error",message:error instanceof Error?error.message:String(error)}));return json(req,{error:"Map request failed."},502);}
 });
