@@ -46,9 +46,11 @@ Deno.serve(async (req: Request) => {
     finally { clearTimeout(timeout); }
     const data = await response.json().catch(() => ({}));
     if (!response.ok) return json(req, { error: "Photo scanning is temporarily unavailable." }, 502);
+    await client.rpc("record_usage_event", { p_category: "photo_ai", p_cost: 0.02, p_metadata: { model: "claude-sonnet-4-6", image_bytes: decodedBytes } });
     return json(req, data);
   } catch (err) {
     const timedOut = err instanceof DOMException && err.name === "AbortError";
+    console.error(JSON.stringify({event:"photo_scan_error",timedOut,message:err instanceof Error?err.message:String(err)}));
     return json(req, { error: timedOut ? "Photo scanning timed out. Please try again." : "Photo scanning failed." }, 502);
   }
 });

@@ -146,6 +146,7 @@ Deno.serve(async (req: Request) => {
       const upstream = await callPepestoOneshot(apiKey, contentText, retailerDomain);
       const redirectUrl = validateRedirectUrl(upstream.redirect_url);
       if (!redirectUrl) return json(req, { error: "Pepesto did not return a safe basket-review link." }, 502);
+      await client.rpc("record_usage_event", { p_category: "pepesto_checkout", p_cost: 0.32, p_metadata: { retailer: retailerDomain } });
       return json(req, {
         retailer: { name: retailerDisplayName(retailerDomain), domain: retailerDomain },
         redirectUrl,
@@ -155,6 +156,7 @@ Deno.serve(async (req: Request) => {
     const upstream = await callPepesto(apiKey, contentText, retailerDomain);
     await client.from("shopping_lists").update({ pepesto_last_compared_at: new Date().toISOString() })
       .eq("id", list.id);
+    await client.rpc("record_usage_event", { p_category: "pepesto_compare", p_cost: 0.04, p_metadata: { retailer: retailerDomain } });
     return json(req, normalisePepestoResponse(upstream, retailerDomain));
   } catch (error) {
     const message = error instanceof DOMException && error.name === "AbortError"
@@ -162,6 +164,7 @@ Deno.serve(async (req: Request) => {
       : (error instanceof Error && error.message.startsWith("Pepesto ")
         ? error.message
         : "The comparison could not be completed.");
+    console.error(JSON.stringify({event:"pepesto_error",message:error instanceof Error?error.message:String(error)}));
     return json(req, { error: message }, 502);
   }
 });
