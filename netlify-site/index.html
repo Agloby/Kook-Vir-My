@@ -59,6 +59,7 @@
   .btn{background:var(--saffron); color:#1F2421; border:none; font-weight:600; font-size:14px; padding:11px 20px; border-radius:7px; cursor:pointer;}
   .btn:hover{background:#DEB543;}
   .btn:disabled{opacity:0.5; cursor:default;}
+  :focus-visible{outline:3px solid var(--saffron); outline-offset:3px;}
   .btn.ghost{background:none; border:1px solid var(--line); color:var(--text);}
   .btn.ghost:hover{border-color:var(--saffron-dim);}
   .btn.warn{background:var(--warn); color:#1F2421;}
@@ -193,6 +194,8 @@
   #barcodeVideo{width:100%; border-radius:8px; border:1px solid var(--line);}
   .source-note{font-size:11px; color:var(--text-dim); font-family:'IBM Plex Mono',monospace;}
 
+  @media (max-width:600px){.tabs{overflow-x:auto; justify-content:flex-start;}.tabs button{white-space:nowrap; padding-left:12px; padding-right:12px;}}
+  @media (prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important; animation-duration:0.01ms!important; animation-iteration-count:1!important;}}
   @media print{
     body *{visibility:hidden;}
     #printArea, #printArea *{visibility:visible;}
@@ -207,7 +210,7 @@
   <div class="eyebrow" style="font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:0.14em; text-transform:uppercase; color:var(--saffron); margin-bottom:6px;">Kook vir Jou</div>
   <h1 style="margin-bottom:20px;">Sign in</h1>
   <div class="panel">
-    <div id="authError"></div>
+    <div id="authError" aria-live="polite"></div>
     <label class="field-label" for="authEmail">Email</label>
     <input type="email" id="authEmail" autocomplete="email">
     <label class="field-label" for="authPassword">Password</label>
@@ -215,6 +218,7 @@
     <div class="row" style="margin-top:20px;">
       <button class="btn" id="signInBtn" type="button">Sign in</button>
       <button class="btn ghost" id="signUpBtn" type="button">Create account</button>
+      <button class="btn ghost" id="forgotPasswordBtn" type="button">Forgot password</button>
     </div>
     <div class="hint">First time: enter an email and password, then tap Create account. If email confirmation is switched on for this project, check your inbox before signing in.</div>
   </div>
@@ -230,13 +234,13 @@
     <div class="user-chip"><span id="userEmail"></span><button id="signOutBtn" type="button">Sign out</button></div>
   </header>
 
-  <nav class="tabs">
-    <button data-tab="recipes" class="active">New recipes</button>
-    <button data-tab="favourites">Favourites</button>
-    <button data-tab="koskas">Koskas</button>
-    <button data-tab="plan">Meal plan</button>
-    <button data-tab="shopping">Shopping</button>
-    <button data-tab="profile">Profile &amp; shops</button>
+  <nav class="tabs" role="tablist" aria-label="Main sections">
+    <button type="button" role="tab" aria-selected="true" aria-controls="tabRecipes" data-tab="recipes" class="active">New recipes</button>
+    <button type="button" role="tab" aria-selected="false" aria-controls="tabFavourites" data-tab="favourites">Favourites</button>
+    <button type="button" role="tab" aria-selected="false" aria-controls="tabKoskas" data-tab="koskas">Koskas</button>
+    <button type="button" role="tab" aria-selected="false" aria-controls="tabPlan" data-tab="plan">Meal plan</button>
+    <button type="button" role="tab" aria-selected="false" aria-controls="tabShopping" data-tab="shopping">Shopping</button>
+    <button type="button" role="tab" aria-selected="false" aria-controls="tabProfile" data-tab="profile">Profile &amp; shops</button>
   </nav>
 
   <div class="wrap">
@@ -500,15 +504,8 @@
       </section>
 
       <section class="panel">
-        <h2>Google Maps API key</h2>
-        <div class="sub">Your own key, used only from your browser to your own Google Cloud project. Needs Geocoding API and Places API (New) enabled, with billing on (Google requires a card on file even within the free monthly usage cap). Restrict the key to this site's domain in Google Cloud Console.</div>
-        <input type="text" id="mapsKeyInput" placeholder="AIza...">
-        <button class="btn ghost small" id="saveMapsKeyBtn" type="button" style="margin-top:10px;">Save key</button>
-      </section>
-
-      <section class="panel">
         <h2>Shops</h2>
-        <div class="sub">Pin the ones you always want considered. "Find shops within 20km" needs the Maps key above and a saved address.</div>
+        <div class="sub">Pin the ones you always want considered. Save your address first to find shops within 20km.</div>
         <button class="btn ghost small" id="findShopsBtn" type="button">Find shops within 20km</button>
         <div id="mapsStatus" class="hint"></div>
         <label class="field-label">Your shops</label>
@@ -517,6 +514,12 @@
           <input type="text" id="shopManualInput" placeholder="Add a shop by name" style="flex:1;">
           <button class="btn ghost small" id="shopManualAdd" type="button">Add</button>
         </div>
+      </section>
+      <section class="panel">
+        <h2>Privacy &amp; account</h2>
+        <div class="sub">Recipe requests may send your selected diet, goals, pantry summary and feedback to Anthropic. Pantry photos are sent only when you choose Scan. Basket comparisons send required shopping-list lines to Pepesto. Address lookup uses the server-side Google Maps integration. Supabase stores your household data.</div>
+        <button class="btn warn small" id="deleteAccountBtn" type="button">Delete my account and personal data</button>
+        <div id="deleteAccountStatus" class="hint" aria-live="polite"></div>
       </section>
     </section>
 
@@ -542,9 +545,9 @@
 </div>
 
 <!-- LEFTOVER MODAL -->
-<div id="leftoverModal" class="hidden">
+<div id="leftoverModal" class="hidden" role="dialog" aria-modal="true" aria-labelledby="leftoverModalTitle">
   <div class="modal-inner">
-    <h3 style="margin-bottom:16px;">Any leftovers?</h3>
+    <h3 id="leftoverModalTitle" style="margin-bottom:16px;">Any leftovers?</h3>
     <div class="chip-grid" id="leftoverChips">
       <button type="button" class="chip" data-amt="none">None</button>
       <button type="button" class="chip" data-amt="a little">A little</button>
@@ -558,9 +561,9 @@
 </div>
 
 <!-- STOCK DEDUCTION REVIEW MODAL -->
-<div id="deductModal" class="hidden">
+<div id="deductModal" class="hidden" role="dialog" aria-modal="true" aria-labelledby="deductModalTitle">
   <div class="modal-inner">
-    <h3 style="margin-bottom:6px;">Stock changes to apply</h3>
+    <h3 id="deductModalTitle" style="margin-bottom:6px;">Stock changes to apply</h3>
     <div class="hint" style="margin-bottom:14px;">Only pantry items marked "track use in recipes" are considered. Untick anything you don't want deducted — nothing changes until you apply, and you can undo afterwards.</div>
     <div id="deductRows"></div>
     <div id="deductNoneMsg" class="hint hidden">No tracked pantry items match this recipe's ingredients, so there's nothing to deduct.</div>
@@ -572,7 +575,7 @@
 </div>
 
 <!-- ADD MEAL MODAL -->
-<div id="mealModal" class="hidden">
+<div id="mealModal" class="hidden" role="dialog" aria-modal="true" aria-labelledby="mealModalTitle">
   <div class="modal-inner">
     <h3 style="margin-bottom:6px;" id="mealModalTitle">Add meal</h3>
     <div class="hint" id="mealModalSub" style="margin-bottom:14px;"></div>
@@ -597,9 +600,9 @@
 </div>
 
 <!-- RATING MODAL -->
-<div id="ratingModal" class="hidden">
+<div id="ratingModal" class="hidden" role="dialog" aria-modal="true" aria-labelledby="ratingModalTitle">
   <div class="modal-inner">
-    <h3 style="margin-bottom:16px;">Rate this recipe</h3>
+    <h3 id="ratingModalTitle" style="margin-bottom:16px;">Rate this recipe</h3>
     <div id="starRows"></div>
     <label class="field-label">Quick tags</label>
     <div class="chip-grid" id="ratingQuickTags" style="margin-bottom:4px;"></div>
@@ -619,7 +622,7 @@
 </footer>
 
 <script type="module">
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.110.5';
 import { PEPESTO_RETAILERS, PEPESTO_ESTIMATED_PRICES_EUR, rankComparisonResults, cheapestCompleteDomain, createRequestGate, settleRetailerComparisons, validHandoffUrl } from './pepesto-helpers.js';
 import {
   CATEGORY_ORDER, categorizeIngredient, getItemCategory,
@@ -667,10 +670,34 @@ const state = {
   currentResults: null
 };
 
+// Shared accessible-dialog behavior for all modal overlays.
+const dialogCloseButtons = {leftoverModal:'skipLeftoverBtn',deductModal:'deductCancelBtn',mealModal:'mealCancelBtn',ratingModal:'cancelRatingBtn'};
+let dialogReturnFocus = null;
+Object.keys(dialogCloseButtons).forEach(id => {
+  const dialog=document.getElementById(id);
+  new MutationObserver(() => {
+    if(!dialog.classList.contains('hidden')){
+      dialogReturnFocus=document.activeElement;
+      requestAnimationFrame(() => dialog.querySelector('button,input,select,textarea,[tabindex]:not([tabindex="-1"])')?.focus());
+    } else if(dialogReturnFocus instanceof HTMLElement){ dialogReturnFocus.focus(); dialogReturnFocus=null; }
+  }).observe(dialog,{attributes:true,attributeFilter:['class']});
+  dialog.addEventListener('keydown', e => {
+    if(e.key==='Escape'){ document.getElementById(dialogCloseButtons[id])?.click(); return; }
+    if(e.key!=='Tab') return;
+    const focusable=[...dialog.querySelectorAll('button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),a[href],[tabindex]:not([tabindex="-1"])')];
+    if(!focusable.length) return; const first=focusable[0],last=focusable.at(-1);
+    if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
+    else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
+  });
+});
+
 // ---------------- AUTH ----------------
 supabase.auth.onAuthStateChange((event, sess) => {
+  const previousUserId = session?.user?.id;
   session = sess;
-  if(sess){ showApp(); } else { showAuth(); }
+  if(sess){
+    if(!previousUserId || previousUserId !== sess.user.id || event === 'SIGNED_IN' || event === 'INITIAL_SESSION') showApp();
+  } else { showAuth(); }
 });
 
 document.getElementById('signInBtn').addEventListener('click', async () => {
@@ -688,7 +715,21 @@ document.getElementById('signUpBtn').addEventListener('click', async () => {
   if(error) box.appendChild(el('div', {class:'error-box', text: error.message}));
   else box.appendChild(el('div', {class:'ok-box', text:'Account created. If email confirmation is on, check your inbox, then sign in.'}));
 });
+document.getElementById('forgotPasswordBtn').addEventListener('click', async () => {
+  const email=document.getElementById('authEmail').value.trim(),box=document.getElementById('authError'); box.innerHTML='';
+  if(!email){box.appendChild(el('div',{class:'error-box',text:'Enter your email address first.'}));return;}
+  const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:window.location.origin});
+  box.appendChild(el('div',{class:error?'error-box':'ok-box',text:error?error.message:'Password-reset instructions have been sent if that account exists.'}));
+});
 document.getElementById('signOutBtn').addEventListener('click', async () => { await supabase.auth.signOut(); });
+document.getElementById('deleteAccountBtn').addEventListener('click', async () => {
+  if(!confirm('Permanently delete your account? Shared household data may remain for other members. This cannot be undone.')) return;
+  const typed=prompt('Type DELETE MY ACCOUNT to confirm permanent deletion.'); if(typed!=='DELETE MY ACCOUNT') return;
+  const status=document.getElementById('deleteAccountStatus'); status.textContent='Deleting account…';
+  const {data,error}=await supabase.functions.invoke('delete-account',{body:{confirmation:typed}});
+  if(error||!data?.deleted){status.textContent=data?.error||'Account deletion failed.';return;}
+  await supabase.auth.signOut(); location.reload();
+});
 
 function showAuth(){
   document.getElementById('authScreen').classList.remove('hidden');
@@ -728,11 +769,13 @@ async function showApp(){
 
 // ---------------- PROFILE ----------------
 async function loadProfile(){
-  let { data } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
+  let { data, error } = await supabase.from('profiles').select('id,units_preference,goals').eq('id', session.user.id).maybeSingle();
+  if(error) throw new Error('Your profile could not be loaded.');
   if(!data){
     // trigger may not have fired yet on brand-new signup, retry once
     await new Promise(r => setTimeout(r, 1200));
-    ({ data } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle());
+    ({ data, error } = await supabase.from('profiles').select('id,units_preference,goals').eq('id', session.user.id).maybeSingle());
+    if(error) throw new Error('Your profile could not be loaded.');
   }
   profile = data || { id: session.user.id, units_preference:'metric', goals:{} };
   state.units = profile.units_preference || 'metric';
@@ -757,25 +800,30 @@ document.getElementById('saveGoalsBtn').addEventListener('click', async () => {
 
 // ---------------- HOUSEHOLD (shared between everyone who joins with the invite code) ----------------
 async function loadHousehold(){
-  let { data: membership } = await supabase.from('household_members').select('household_id, role').eq('user_id', session.user.id).maybeSingle();
+  let { data: membership, error: membershipError } = await supabase.from('household_members').select('household_id, role').eq('user_id', session.user.id).maybeSingle();
+  if(membershipError) throw new Error('Your household membership could not be loaded.');
   if(!membership){
     await new Promise(r => setTimeout(r, 1500));
-    ({ data: membership } = await supabase.from('household_members').select('household_id, role').eq('user_id', session.user.id).maybeSingle());
+    ({ data: membership, error: membershipError } = await supabase.from('household_members').select('household_id, role').eq('user_id', session.user.id).maybeSingle());
+    if(membershipError) throw new Error('Your household membership could not be loaded.');
   }
   if(!membership){
     await new Promise(r => setTimeout(r, 2500));
-    ({ data: membership } = await supabase.from('household_members').select('household_id, role').eq('user_id', session.user.id).maybeSingle());
+    ({ data: membership, error: membershipError } = await supabase.from('household_members').select('household_id, role').eq('user_id', session.user.id).maybeSingle());
+    if(membershipError) throw new Error('Your household membership could not be loaded.');
   }
   if(!membership){
     document.getElementById('profileHint').innerHTML = '';
     document.getElementById('profileHint').appendChild(el('div', {class:'error-box', text:'Your household record hasn\'t appeared yet, this can happen right after signing up. Try refreshing the page in a moment.'}));
     throw new Error('No household membership found for this account yet.');
   }
-  const { data: h } = await supabase.from('households').select('*').eq('id', membership.household_id).single();
+  const { data: h, error: householdError } = await supabase.from('households')
+    .select('id,invite_code,allergies,diets,delivery_address,delivery_eircode,delivery_lat,delivery_lon')
+    .eq('id', membership.household_id).single();
+  if(householdError || !h) throw new Error('Your household could not be loaded.');
   household = h;
   document.getElementById('addrInput').value = household.delivery_address || '';
   document.getElementById('eircodeInput').value = household.delivery_eircode || '';
-  document.getElementById('mapsKeyInput').value = household.maps_api_key || '';
   const hint = document.getElementById('profileHint');
   hint.textContent = (household.allergies||[]).length || (household.diets||[]).length
     ? `Applying from your household: avoiding ${[...(household.allergies||[]), ...(household.diets||[])].join(', ')}. Change this under Profile & shops.`
@@ -867,36 +915,25 @@ document.getElementById('saveAddrBtn').addEventListener('click', async () => {
   const status = document.getElementById('geocodeStatus');
   status.textContent = 'Saving…';
   let lat = household.delivery_lat, lon = household.delivery_lon;
-  if(household.maps_api_key && address){
+  if(address){
     try {
-      const resp = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address + ' ' + eircode)}&key=${household.maps_api_key}`);
-      const data = await resp.json();
-      if(data.status === 'OK' && data.results[0]){
-        lat = data.results[0].geometry.location.lat;
-        lon = data.results[0].geometry.location.lng;
+      const { data, error } = await supabase.functions.invoke('maps-proxy', {body:{action:'geocode', address:[address,eircode].filter(Boolean).join(' ')}});
+      if(!error && Number.isFinite(data?.lat) && Number.isFinite(data?.lon)){
+        lat = data.lat;
+        lon = data.lon;
         status.textContent = 'Address saved and located on the map.';
       } else {
-        status.textContent = 'Address saved, but geocoding failed (' + data.status + '). Shop search by distance will not work until this resolves.';
+        status.textContent = 'Address saved, but it could not be located. Shop search by distance will not work until this resolves.';
       }
     } catch(e){
       status.textContent = 'Address saved, but the geocoding request failed: ' + e.message;
     }
-  } else if(!household.maps_api_key){
-    status.textContent = 'Address saved. Add a Google Maps key below to enable distance-based shop search.';
   }
   const { error } = await safeDb(supabase.from('households').update({ delivery_address: address, delivery_eircode: eircode, delivery_lat: lat, delivery_lon: lon }).eq('id', household.id), 'Could not save the address');
   if(error){ status.textContent = 'The address did not save — try again.'; return; }
   household.delivery_address = address; household.delivery_eircode = eircode;
   household.delivery_lat = lat; household.delivery_lon = lon;
   if(status.textContent === 'Saving…') status.textContent = 'Address saved.';
-});
-
-document.getElementById('saveMapsKeyBtn').addEventListener('click', async () => {
-  const key = document.getElementById('mapsKeyInput').value.trim();
-  const { error } = await safeDb(supabase.from('households').update({ maps_api_key: key }).eq('id', household.id), 'Could not save the Maps key');
-  if(error) return;
-  household.maps_api_key = key;
-  document.getElementById('mapsStatus').textContent = 'Key saved.';
 });
 
 // ---------------- SHOPS ----------------
@@ -959,30 +996,16 @@ document.getElementById('shopManualAdd').addEventListener('click', async () => {
 
 document.getElementById('findShopsBtn').addEventListener('click', async () => {
   const status = document.getElementById('mapsStatus');
-  if(!household.maps_api_key){ status.textContent = 'Add a Google Maps key above first.'; return; }
   if(!household.delivery_lat || !household.delivery_lon){ status.textContent = 'Save your address above first so it can be located.'; return; }
   status.textContent = 'Searching within 20km…';
   try {
-    const resp = await fetch('https://places.googleapis.com/v1/places:searchNearby', {
-      method:'POST',
-      headers:{
-        'Content-Type':'application/json',
-        'X-Goog-Api-Key': household.maps_api_key,
-        'X-Goog-FieldMask':'places.displayName,places.location,places.formattedAddress'
-      },
-      body: JSON.stringify({
-        includedTypes:['supermarket'],
-        maxResultCount:20,
-        locationRestriction:{ circle:{ center:{ latitude: household.delivery_lat, longitude: household.delivery_lon }, radius: 20000 } }
-      })
-    });
-    const data = await resp.json();
-    if(!resp.ok){ status.textContent = 'Maps request failed: ' + (data.error?.message || resp.status); return; }
+    const { data, error } = await supabase.functions.invoke('maps-proxy', {body:{action:'nearby',lat:household.delivery_lat,lon:household.delivery_lon}});
+    if(error || data?.error){ status.textContent = data?.error || 'Map search failed.'; return; }
     const found = data.places || [];
     let added = 0;
     for(const p of found){
-      const name = p.displayName?.text; if(!name) continue;
-      const dLat = p.location.latitude, dLon = p.location.longitude;
+      const name = p.name; if(!name) continue;
+      const dLat = p.lat, dLon = p.lon;
       const distance_km = haversineKm(household.delivery_lat, household.delivery_lon, dLat, dLon);
       const existing = shops.find(s => s.name.toLowerCase() === name.toLowerCase());
       if(existing){
@@ -1033,13 +1056,21 @@ async function saveIngredientPrice(name, unit, price){
 // ---------------- TABS ----------------
 document.querySelectorAll('.tabs button').forEach(btn => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tabs button').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-selected','false'); });
     btn.classList.add('active');
+    btn.setAttribute('aria-selected','true');
     ['recipes','favourites','koskas','plan','shopping','profile'].forEach(t => document.getElementById('tab'+t[0].toUpperCase()+t.slice(1)).classList.toggle('hidden', t !== btn.dataset.tab));
     if(btn.dataset.tab === 'favourites') loadFavourites();
     if(btn.dataset.tab === 'koskas'){ loadPantry(); loadLeftovers(); }
     if(btn.dataset.tab === 'plan') loadMealPlan();
     if(btn.dataset.tab === 'shopping') loadShoppingLists();
+  });
+  btn.addEventListener('keydown', e => {
+    if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key)) return;
+    e.preventDefault();
+    const tabs=[...document.querySelectorAll('.tabs button')], i=tabs.indexOf(btn);
+    const next=e.key==='Home'?0:e.key==='End'?tabs.length-1:(i+(e.key==='ArrowRight'?1:-1)+tabs.length)%tabs.length;
+    tabs[next].focus(); tabs[next].click();
   });
 });
 
@@ -1129,7 +1160,7 @@ async function safeDb(query, friendlyMessage){
 function showToast(msg, isError){
   let t = document.getElementById('appToast');
   if(!t){
-    t = el('div', {id:'appToast', style:'position:fixed; bottom:20px; left:50%; transform:translateX(-50%); z-index:300; padding:10px 16px; border-radius:7px; font-size:13.5px; max-width:90vw;'});
+    t = el('div', {id:'appToast', role:'status', 'aria-live':'polite', style:'position:fixed; bottom:20px; left:50%; transform:translateX(-50%); z-index:300; padding:10px 16px; border-radius:7px; font-size:13.5px; max-width:90vw;'});
     document.body.appendChild(t);
   }
   t.style.background = isError ? 'var(--warn)' : 'var(--ok)';
@@ -1303,7 +1334,17 @@ async function callClaudeForRecipes(prompt){
 }
 
 async function persistRecipes(parsed){
-  const rows = (parsed.recipes||[]).map(r => ({
+  if(!parsed || !Array.isArray(parsed.recipes) || parsed.recipes.length > 6) throw new Error('Recipe response has an invalid structure.');
+  const recipes = parsed.recipes.map((r, index) => {
+    if(!r || typeof r.title !== 'string' || !r.title.trim() || r.title.length > 200 ||
+      !Array.isArray(r.ingredients) || r.ingredients.length > 60 || !Array.isArray(r.steps) || r.steps.length > 12){
+      throw new Error(`Recipe ${index + 1} has invalid fields.`);
+    }
+    r.ingredients.forEach(ing => { if(!ing || typeof ing.item !== 'string' || !ing.item.trim() || ing.item.length > 200) throw new Error(`Recipe ${index + 1} has an invalid ingredient.`); });
+    r.steps.forEach(step => { if(!step || typeof step.text !== 'string' || !step.text.trim() || step.text.length > 2000) throw new Error(`Recipe ${index + 1} has an invalid step.`); });
+    return r;
+  });
+  const rows = recipes.map(r => ({
     household_id: household.id, title:r.title, description:r.description, cuisine:r.cuisine,
     total_time_minutes:r.totalTimeMinutes, servings:r.servings, ingredients:r.ingredients||[],
     steps:r.steps||[], allergen_note:r.allergenNote, shopping_note:r.shoppingNote, cost_estimate:null, is_favourite:false,
@@ -1386,15 +1427,15 @@ function buildRecipeCard(r, onHandLower, isAlt){
         if(applied.length){
           const undoBtn = el('button', {class:'btn ghost small', type:'button', text:'Undo stock update'});
           undoBtn.addEventListener('click', async () => {
-            let failed = false;
-            for(const d of applied){
-              const { error } = await safeDb(supabase.from('pantry_items').update({ quantity: d.previousQuantity }).eq('id', d.id), 'Could not undo a stock change');
-              if(error){ failed = true; continue; }
+            const { error } = await safeDb(supabase.rpc('set_pantry_quantities', {p_changes:applied.map(d => ({id:d.id,quantity:d.previousQuantity}))}), 'Could not undo stock changes');
+            if(!error){
+              for(const d of applied){
               const item = pantryItems.find(p => p.id === d.id);
               if(item) item.quantity = d.previousQuantity;
+              }
             }
             renderPantryList(); renderShoppingNeeded(); renderExpiringPanel();
-            if(!failed){ showToast('Stock changes undone'); undoBtn.remove(); }
+            if(!error){ showToast('Stock changes undone'); undoBtn.remove(); }
           });
           actions.appendChild(undoBtn);
         }
@@ -1626,13 +1667,17 @@ document.getElementById('manItemAdd').addEventListener('click', async () => {
   document.getElementById('manItemTrack').checked = false;
 });
 
-function fileToBase64(file){
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result.split(',')[1]);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
+async function preparePantryPhoto(file){
+  if(!['image/jpeg','image/png','image/webp'].includes(file.type)) throw new Error('Choose a JPEG, PNG, or WebP photo.');
+  if(file.size > 12_000_000) throw new Error('The original photo is too large. Choose one under 12 MB.');
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement('canvas'); canvas.width = Math.max(1, Math.round(bitmap.width * scale)); canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height); bitmap.close();
+  const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.82));
+  if(!blob || blob.size > 4_000_000) throw new Error('The compressed photo is still too large. Try a closer crop.');
+  const dataUrl = await new Promise((resolve,reject) => { const reader=new FileReader(); reader.onload=()=>resolve(reader.result); reader.onerror=reject; reader.readAsDataURL(blob); });
+  return {base64:dataUrl.split(',')[1], mediaType:'image/jpeg'};
 }
 
 document.getElementById('pantryPhotoInput').addEventListener('change', async (e) => {
@@ -1643,18 +1688,19 @@ document.getElementById('pantryPhotoInput').addEventListener('change', async (e)
   resultsWrap.innerHTML = '';
   status.textContent = 'Reading the photo…';
   try {
-    const base64 = await fileToBase64(file);
+    const prepared = await preparePantryPhoto(file);
     const resp = await fetch(`${SUPABASE_URL}/functions/v1/scan-pantry-photo`, {
       method: 'POST',
       headers: { 'Content-Type':'application/json', 'Authorization':'Bearer ' + session.access_token },
-      body: JSON.stringify({ imageBase64: base64, mediaType: file.type || 'image/jpeg' })
+      body: JSON.stringify({ imageBase64: prepared.base64, mediaType: prepared.mediaType })
     });
     const data = await resp.json();
     if(!resp.ok){ status.textContent = 'Scan failed: ' + (data.error || resp.status); return; }
     let raw = (data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n').trim();
     raw = raw.replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
     const parsed = JSON.parse(raw);
-    const items = parsed.items || [];
+    if(!parsed || !Array.isArray(parsed.items)) throw new Error('The scan returned an invalid result.');
+    const items = parsed.items.slice(0, 50).filter(it => it && typeof it.name === 'string' && it.name.trim() && it.name.length <= 200 && ['high','medium','low'].includes(it.confidence));
     if(!items.length){ status.textContent = "Couldn't make out any items in that photo, try a closer, better-lit shot."; return; }
     status.textContent = `Found ${items.length} possible item(s), review and confirm each before it saves:`;
     items.forEach(it => resultsWrap.appendChild(buildScanResultRow(it)));
@@ -1671,18 +1717,19 @@ function buildScanResultRow(it){
   row.appendChild(el('div', {style:'font-weight:600;'}, [document.createTextNode(it.name), conf]));
   row.appendChild(el('div', {class:'hint', text: `AI's guess: ${it.estimatedQuantity || 'not given'}${it.unit ? ' '+it.unit : ''}, confirm a number below`}));
   const inputRow = el('div', {class:'row', style:'margin-top:8px;'});
-  const nameInput = el('input', {type:'text', style:'flex:2;'}); nameInput.value = it.name;
+  const nameInput = el('input', {type:'text', 'aria-label':'Scanned item name', style:'flex:2;'}); nameInput.value = it.name;
   const numericGuess = parseFloat(it.estimatedQuantity);
-  const qtyInput = el('input', {type:'number', step:'0.1', min:'0', placeholder:'qty', style:'width:80px;'});
+  const qtyInput = el('input', {type:'number', step:'0.1', min:'0', 'aria-label':'Scanned item quantity', placeholder:'qty', style:'width:80px;'});
   qtyInput.value = isNaN(numericGuess) ? '' : numericGuess;
-  const unitInput = el('input', {type:'text', style:'width:70px;'}); unitInput.value = it.unit||'';
-  const expInput = el('input', {type:'text', placeholder:'yyyy-mm-dd', style:'width:120px;'}); expInput.value = it.expiryDateGuess||'';
+  const unitInput = el('input', {type:'text', 'aria-label':'Scanned item unit', style:'width:70px;'}); unitInput.value = it.unit||'';
+  const expInput = el('input', {type:'date', 'aria-label':'Scanned item expiry date', style:'width:150px;'}); expInput.value = /^\d{4}-\d{2}-\d{2}$/.test(it.expiryDateGuess||'') ? it.expiryDateGuess : '';
   inputRow.appendChild(nameInput); inputRow.appendChild(qtyInput); inputRow.appendChild(unitInput); inputRow.appendChild(expInput);
   row.appendChild(inputRow);
   const addBtn = el('button', {class:'btn ghost small', type:'button', text:'Add to pantry', style:'margin-top:8px;'});
   addBtn.addEventListener('click', async () => {
     if(!qtyInput.value.trim()){ qtyInput.focus(); qtyInput.style.borderColor = 'var(--warn)'; return; }
     const quantity = parseFloat(qtyInput.value);
+    if(!Number.isFinite(quantity) || quantity < 0 || !nameInput.value.trim()){ showToast('Enter a valid item name and non-negative quantity', true); return; }
     const { data, error } = await supabase.from('pantry_items').insert({
       household_id: household.id, name: nameInput.value.trim(), quantity, unit: unitInput.value.trim()||null,
       expiry_date: expInput.value.trim()||null, source:'photo'
@@ -1769,15 +1816,10 @@ document.getElementById('deductCancelBtn').addEventListener('click', () => {
 document.getElementById('deductApplyBtn').addEventListener('click', async () => {
   if(!deductContext) return;
   const ticked = [...document.querySelectorAll('#deductRows input[type=checkbox]')].filter(c => c.checked).map(c => deductContext.proposals[Number(c.dataset.idx)]);
-  const applied = [];
-  for(const p of ticked){
-    const previousQuantity = p.item.quantity;
-    const newQty = Math.max(0, previousQuantity - p.deduct);
-    const { error } = await safeDb(supabase.from('pantry_items').update({ quantity: newQty, updated_at: new Date().toISOString() }).eq('id', p.item.id), 'Could not update stock for ' + p.item.name);
-    if(error) continue;
-    p.item.quantity = newQty;
-    applied.push({ id: p.item.id, previousQuantity });
-  }
+  const applied = ticked.map(p => ({id:p.item.id, previousQuantity:p.item.quantity, quantity:Math.max(0,p.item.quantity-p.deduct)}));
+  const { error } = await safeDb(supabase.rpc('set_pantry_quantities', {p_changes:applied.map(d => ({id:d.id,quantity:d.quantity}))}), 'Could not update pantry stock');
+  if(error) return;
+  applied.forEach(d => { const item=pantryItems.find(p=>p.id===d.id); if(item) item.quantity=d.quantity; });
   renderPantryList(); renderShoppingNeeded(); renderExpiringPanel();
   document.getElementById('deductModal').classList.add('hidden');
   if(applied.length) showToast(`Stock updated for ${applied.length} item(s)`);
@@ -2452,22 +2494,22 @@ function buildListItemRow(item){
     item[field] = value;
   };
   const nameWrap = el('span', {class:'sl-name', style:'flex:2; min-width:130px;'});
-  const nameInput = el('input', {type:'text'}); nameInput.value = item.item_name;
+  const nameInput = el('input', {type:'text', 'aria-label':'Item name'}); nameInput.value = item.item_name;
   nameInput.addEventListener('change', () => saveField('item_name', nameInput.value.trim() || item.item_name, nameInput));
   nameWrap.appendChild(nameInput);
   row.appendChild(nameWrap);
 
-  const qtyInput = el('input', {type:'number', step:'0.1', min:'0', placeholder:'qty', style:'width:70px;'});
+  const qtyInput = el('input', {type:'number', step:'0.1', min:'0', 'aria-label':'Item quantity', placeholder:'qty', style:'width:70px;'});
   if(item.quantity != null) qtyInput.value = item.quantity;
   qtyInput.addEventListener('change', () => saveField('quantity', qtyInput.value === '' ? null : parseFloat(qtyInput.value), qtyInput));
   row.appendChild(qtyInput);
 
-  const unitInput = el('input', {type:'text', placeholder:'unit', style:'width:64px;'});
+  const unitInput = el('input', {type:'text', 'aria-label':'Item unit', placeholder:'unit', style:'width:64px;'});
   unitInput.value = item.unit || '';
   unitInput.addEventListener('change', () => saveField('unit', unitInput.value.trim() || null, unitInput));
   row.appendChild(unitInput);
 
-  const notesInput = el('input', {type:'text', placeholder:'notes / substitutions, e.g. gluten-free only', style:'flex:3; min-width:170px;'});
+  const notesInput = el('input', {type:'text', 'aria-label':'Item notes or substitutions', placeholder:'notes / substitutions, e.g. gluten-free only', style:'flex:3; min-width:170px;'});
   notesInput.value = item.notes || '';
   notesInput.addEventListener('change', () => saveField('notes', notesInput.value.trim() || null, notesInput));
   row.appendChild(notesInput);
@@ -2576,8 +2618,9 @@ document.getElementById('slCopyBtn').addEventListener('click', async () => {
 document.getElementById('slDownloadBtn').addEventListener('click', () => {
   if(!currentList) return;
   const blob = new Blob([buildListExportText()], {type:'text/plain'});
-  const a = el('a', {href: URL.createObjectURL(blob), download: (currentList.title||'shopping-list').replace(/[^a-z0-9]+/gi,'-').toLowerCase() + '.txt'});
-  document.body.appendChild(a); a.click(); a.remove();
+  const url = URL.createObjectURL(blob);
+  const a = el('a', {href:url, download: (currentList.title||'shopping-list').replace(/[^a-z0-9]+/gi,'-').toLowerCase() + '.txt'});
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 0);
 });
 document.getElementById('slPrintBtn').addEventListener('click', () => {
   if(!currentList) return;
