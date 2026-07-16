@@ -1,0 +1,2 @@
+-- Historical migration applied through the Supabase dashboard before this repository
+-- became the canonical migration source. Intentionally empty; preserves history alignment.

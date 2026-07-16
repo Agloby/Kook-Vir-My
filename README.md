@@ -49,9 +49,10 @@ the bucket has a 5 MB object limit and accepts JPEG, PNG and WebP files.
 For future changes: `supabase link --project-ref iwncoqufcivqgjvlynaz && supabase db push`,
 or paste the SQL into the dashboard's SQL editor.
 
-**Edge Functions:** `supabase functions deploy generate-recipes` /
-`scan-pantry-photo`. Both need the `ANTHROPIC_API_KEY` secret
+**Edge Functions:** deploy `generate-recipes`, `scan-pantry-photo`, `pepesto-basket`,
+`maps-proxy` and `delete-account`. The AI functions need the `ANTHROPIC_API_KEY` secret
 (`supabase secrets set ANTHROPIC_API_KEY=... --project-ref iwncoqufcivqgjvlynaz`).
+`maps-proxy` needs a server-side `GOOGLE_MAPS_API_KEY`; this key is never returned to browsers.
 
 ## Pepesto supermarket comparison
 
@@ -81,7 +82,7 @@ calls:
 
 ```sh
 deno test supabase/functions/pepesto-basket/helpers_test.ts
-node --test tests/pepesto-frontend.test.mjs tests/recipe-helpers.test.mjs
+node --test tests/*.test.mjs
 ```
 
 The integration does not run on page load, tab changes, or item edits. Results

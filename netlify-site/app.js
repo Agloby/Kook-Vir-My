@@ -1,681 +1,8 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Kook vir Jou — Recipe Finder</title>
-<meta name="theme-color" content="#1F2421">
-<meta name="description" content="Household recipe finder, Koskas pantry register and shopping lists.">
-<link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="icons/icon-192.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<style>
-  :root{
-    --bg:#1F2421; --card:#262D28; --card-raised:#2E362F; --line:#3B4239;
-    --text:#F2EFE6; --text-dim:#A9B0A5; --saffron:#C9A227; --saffron-dim:#8C7420;
-    --clay:#A9704F; --warn:#D9705E; --ok:#7FA86B; --radius:10px;
-  }
-  *{box-sizing:border-box;}
-  body{margin:0; background:radial-gradient(ellipse at top left, rgba(201,162,39,0.07), transparent 45%), var(--bg); color:var(--text); font-family:'IBM Plex Sans', sans-serif; min-height:100vh; padding-bottom:60px;}
-  h1,h2,h3{font-family:'Fraunces', serif; margin:0; font-weight:600;}
-  .measure{font-family:'IBM Plex Mono', monospace;}
-  a{color:var(--saffron);}
-  .wrap{max-width:820px; margin:0 auto; padding:0 20px;}
-  .hidden{display:none !important;}
-
-  header.top{padding:26px 20px 14px; max-width:820px; margin:0 auto; display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap;}
-  header.top .eyebrow{font-family:'IBM Plex Mono', monospace; font-size:12px; letter-spacing:0.14em; text-transform:uppercase; color:var(--saffron); margin-bottom:6px;}
-  header.top h1{font-size:clamp(26px,5vw,34px); letter-spacing:-0.01em;}
-  .user-chip{font-size:12.5px; color:var(--text-dim); display:flex; align-items:center; gap:10px;}
-  .user-chip button{background:none; border:1px solid var(--line); color:var(--text-dim); border-radius:6px; padding:5px 10px; cursor:pointer; font-size:12px;}
-  .user-chip button:hover{color:var(--text); border-color:var(--saffron-dim);}
-
-  .tabs{display:flex; gap:2px; margin:10px 0 24px; border-bottom:1px solid var(--line); max-width:820px; margin-left:auto; margin-right:auto; padding:0 20px;}
-  .tabs button{background:none; border:none; color:var(--text-dim); font-family:'IBM Plex Mono',monospace; font-size:12px; text-transform:uppercase; letter-spacing:0.06em; padding:10px 16px 12px; cursor:pointer; position:relative;}
-  .tabs button.active{color:var(--saffron);}
-  .tabs button.active::after{content:""; position:absolute; left:0; right:0; bottom:-1px; height:2px; background:var(--saffron);}
-
-  .panel{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:26px 24px; margin-bottom:20px;}
-  .panel h2{font-size:20px; margin-bottom:4px;}
-  .panel .sub{color:var(--text-dim); font-size:14px; margin-bottom:20px;}
-
-  .chip-grid{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;}
-  .chip{border:1px solid var(--line); background:var(--card-raised); color:var(--text); padding:8px 14px; border-radius:999px; font-size:13.5px; cursor:pointer;}
-  button.chip{font-family:inherit; appearance:none; -webkit-appearance:none; text-align:left;}
-  .chip:hover{border-color:var(--saffron-dim);}
-  .chip.selected{background:var(--saffron); border-color:var(--saffron); color:#1F2421; font-weight:600;}
-  .chip.warn.selected{background:var(--warn); border-color:var(--warn); color:#1F2421;}
-
-  label.field-label{display:block; font-size:12.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-dim); margin:18px 0 8px;}
-  label.field-label:first-of-type{margin-top:0;}
-  input[type=text], input[type=email], input[type=password], input[type=number], textarea, select{
-    width:100%; background:var(--bg); border:1px solid var(--line); border-radius:6px; color:var(--text);
-    padding:10px 12px; font-family:'IBM Plex Sans', sans-serif; font-size:14px;
-  }
-  textarea{resize:vertical; min-height:60px;}
-
-  .btn{background:var(--saffron); color:#1F2421; border:none; font-weight:600; font-size:14px; padding:11px 20px; border-radius:7px; cursor:pointer;}
-  .btn:hover{background:#DEB543;}
-  .btn:disabled{opacity:0.5; cursor:default;}
-  .btn.ghost{background:none; border:1px solid var(--line); color:var(--text);}
-  .btn.ghost:hover{border-color:var(--saffron-dim);}
-  .btn.warn{background:var(--warn); color:#1F2421;}
-  .btn.small{padding:7px 13px; font-size:12.5px;}
-  .btn.block{width:100%; padding:13px;}
-
-  .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center;}
-  .nav-row{display:flex; justify-content:space-between; align-items:center; margin-top:26px;}
-  .nav-row .spacer{flex:1;}
-
-  .error-box{border:1px solid var(--warn); background:rgba(217,112,94,0.1); color:#F2C6BE; padding:12px 14px; border-radius:7px; font-size:13.5px; margin-bottom:16px;}
-  .ok-box{border:1px solid var(--ok); background:rgba(127,168,107,0.1); color:#D6E8CC; padding:12px 14px; border-radius:7px; font-size:13.5px; margin-bottom:16px;}
-  .hint{font-size:12.5px; color:var(--text-dim); line-height:1.6; margin-top:6px;}
-
-  .stepper{display:flex; align-items:center; gap:12px;}
-  .stepper button{width:32px; height:32px; border-radius:6px; border:1px solid var(--line); background:var(--card-raised); color:var(--text); font-size:16px; cursor:pointer;}
-  .stepper .val{font-family:'IBM Plex Mono', monospace; font-size:18px; min-width:24px; text-align:center;}
-
-  .shop-chip{display:inline-flex; align-items:center; gap:8px; border:1px solid var(--line); background:var(--card-raised); color:var(--text); padding:6px 8px 6px 14px; border-radius:999px; font-size:13.5px;}
-  .shop-chip.selected{background:var(--saffron); border-color:var(--saffron); color:#1F2421; font-weight:600;}
-  .shop-chip .icon-btn{background:none; border:none; cursor:pointer; color:inherit; opacity:0.65; font-size:12px; padding:3px 4px; border-radius:4px;}
-  .shop-chip .icon-btn:hover{opacity:1; background:rgba(0,0,0,0.12);}
-  .shop-chip.pinned{box-shadow:0 0 0 1px var(--saffron-dim) inset;}
-  .shop-meta{font-size:11px; opacity:0.7; margin-left:2px;}
-
-  .taglist{display:flex; flex-wrap:wrap; gap:8px;}
-  .tag{background:var(--card-raised); border:1px solid var(--line); border-radius:6px; padding:6px 10px 6px 12px; font-size:13px; display:flex; align-items:center; gap:8px;}
-  .tag button{background:none; border:none; color:var(--text-dim); cursor:pointer; font-size:14px; padding:0;}
-
-  .recipe-card{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); margin-bottom:18px; overflow:hidden;}
-  .recipe-card .rc-top{padding:20px 22px 16px; border-bottom:1px dashed var(--line); position:relative;}
-  .recipe-card .rc-top::before{content:""; position:absolute; top:-1px; left:0; right:0; height:4px; background:repeating-linear-gradient(90deg, var(--saffron) 0 10px, transparent 10px 18px); opacity:0.6;}
-  .recipe-card h3{font-size:21px; margin-bottom:6px;}
-  .recipe-card .desc{color:var(--text-dim); font-size:14px; line-height:1.55;}
-  .rc-meta{display:flex; gap:16px; margin-top:12px; flex-wrap:wrap;}
-  .rc-meta span{font-family:'IBM Plex Mono', monospace; font-size:12px; color:var(--saffron);}
-  .rc-actions{display:flex; gap:8px; flex-wrap:wrap; margin-top:14px;}
-  .rc-body{padding:18px 22px 22px; display:grid; grid-template-columns:1fr 1.4fr; gap:24px;}
-  @media (max-width:600px){.rc-body{grid-template-columns:1fr;}}
-  .rc-body h4{font-family:'IBM Plex Mono', monospace; font-size:11.5px; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-dim); margin-bottom:10px;}
-  .ing-list{list-style:none; margin:0; padding:0;}
-  .ing-list li{display:flex; justify-content:space-between; gap:10px; font-size:13.5px; padding:5px 0; border-bottom:1px solid var(--line);}
-  .ing-list li:last-child{border-bottom:none;}
-  .ing-list .amt{font-family:'IBM Plex Mono', monospace; color:var(--saffron); white-space:nowrap;}
-  .ing-list li.have .item::before{content:"● "; color:var(--ok);}
-  .steps-list{margin:0; padding-left:20px; font-size:13.5px; line-height:1.75;}
-  .steps-list li{margin-bottom:6px;}
-  .rc-note{grid-column:1/-1; font-size:12.5px; color:var(--text-dim); border-top:1px solid var(--line); padding-top:12px;}
-  .rc-note b{color:var(--text);}
-  .rc-cost{grid-column:1/-1; display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--line); padding-top:14px; font-family:'IBM Plex Mono', monospace;}
-  .rc-cost .total{font-size:18px; color:var(--saffron);}
-  .rc-cost .note{font-size:11px; color:var(--text-dim); font-family:'IBM Plex Sans', sans-serif;}
-
-  .loading-block{text-align:center; padding:50px 10px; color:var(--text-dim);}
-  .spinner{width:26px; height:26px; margin:0 auto 16px; border:2px solid var(--line); border-top-color:var(--saffron); border-radius:50%; animation:spin 0.8s linear infinite;}
-  @keyframes spin{to{transform:rotate(360deg);}}
-
-  /* Cooking mode overlay */
-  #cookingOverlay{position:fixed; inset:0; background:var(--bg); z-index:200; display:flex; flex-direction:column;}
-  #cookingOverlay .ck-top{padding:18px 22px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center;}
-  #cookingOverlay .ck-body{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:30px; text-align:center;}
-  #cookingOverlay .ck-stepnum{font-family:'IBM Plex Mono', monospace; color:var(--saffron); font-size:13px; margin-bottom:14px;}
-  #cookingOverlay .ck-text{font-size:clamp(20px,4vw,30px); max-width:640px; line-height:1.5; font-family:'Fraunces', serif;}
-  #cookingOverlay .ck-timer{margin-top:26px; font-family:'IBM Plex Mono', monospace; font-size:40px; color:var(--saffron);}
-  #cookingOverlay .ck-nav{padding:22px; display:flex; justify-content:space-between; gap:12px; border-top:1px solid var(--line);}
-  #cookingOverlay .ck-nav button{flex:1; padding:16px;}
-  .wake-badge{font-size:11px; color:var(--ok); font-family:'IBM Plex Mono',monospace;}
-  .wake-badge.off{color:var(--warn);}
-
-  /* Modals */
-  #ratingModal, #leftoverModal, #deductModal, #mealModal{position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:210; display:flex; align-items:center; justify-content:center; padding:20px; overflow-y:auto;}
-  #ratingModal .modal-inner, #leftoverModal .modal-inner, #deductModal .modal-inner, #mealModal .modal-inner{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:26px; max-width:420px; width:100%; max-height:90vh; overflow-y:auto;}
-  #deductModal .modal-inner{max-width:480px;}
-  .star-row{display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;}
-  .star-row .cat{font-size:13.5px; width:110px;}
-  .stars{display:flex; gap:4px;}
-  .stars span{cursor:pointer; font-size:22px; color:var(--line);}
-  .stars span.on{color:var(--saffron);}
-
-  footer.note{max-width:820px; margin:30px auto 0; padding:0 20px; font-size:12px; color:var(--text-dim); line-height:1.6;}
-
-  /* Order Mode / shopping list */
-  .status-pill{border:1px solid var(--line); background:var(--card-raised); color:var(--text-dim); border-radius:999px; padding:3px 10px; font-size:11px; font-family:'IBM Plex Mono',monospace; cursor:pointer; white-space:nowrap;}
-  .status-pill.required{border-color:var(--saffron-dim); color:var(--saffron);}
-  .status-pill.optional{color:var(--text-dim);}
-  .status-pill.check_pantry{border-color:var(--clay); color:var(--clay);}
-  .status-pill.already_have{border-color:var(--ok); color:var(--ok);}
-  .status-pill.bought{border-color:var(--ok); color:var(--ok); text-decoration:line-through;}
-  .sl-item{display:flex; gap:8px; align-items:flex-start; padding:10px 0; border-bottom:1px solid var(--line); flex-wrap:wrap;}
-  .sl-item:last-child{border-bottom:none;}
-  .sl-item input[type=text], .sl-item input[type=number]{padding:6px 8px; font-size:13px;}
-  .sl-item.already_have .sl-name input, .sl-item.bought .sl-name input{opacity:0.5; text-decoration:line-through;}
-  .list-card{cursor:pointer;}
-  .list-card:hover{border-color:var(--saffron-dim);}
-  .pepesto-section{margin-top:22px; padding-top:18px; border-top:1px solid var(--line);}
-  .pepesto-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin-top:14px;}
-  .pepesto-card{border:1px solid var(--line); border-radius:8px; background:var(--card-raised); padding:15px;}
-  .pepesto-card.complete{border-color:var(--ok);}
-  .pepesto-card.incomplete,.pepesto-card.failed{border-color:var(--warn);}
-  .pepesto-total{font-family:'IBM Plex Mono',monospace; font-size:20px; color:var(--saffron); margin:8px 0;}
-  .pepesto-badge{display:inline-block; border-radius:999px; padding:3px 8px; font:10px 'IBM Plex Mono',monospace; background:var(--saffron); color:var(--bg); margin-top:6px;}
-  .pepesto-review{margin-top:10px; border-top:1px dashed var(--line); padding-top:8px;}
-  .pepesto-match{display:flex; gap:9px; padding:8px 0; border-bottom:1px solid var(--line); font-size:12px;}
-  .pepesto-match img{width:46px; height:46px; object-fit:contain; background:#fff; border-radius:5px;}
-  .pepesto-unmatched{color:#F2C6BE; margin:6px 0; font-size:12px;}
-
-  /* Meal plan grid */
-  .mp-day{border:1px solid var(--line); border-radius:var(--radius); background:var(--card); margin-bottom:12px; overflow:hidden;}
-  .mp-day.today{box-shadow:0 0 0 1px var(--saffron-dim) inset;}
-  .mp-day-head{padding:10px 14px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; font-family:'IBM Plex Mono',monospace; font-size:12px; text-transform:uppercase; letter-spacing:0.06em; color:var(--saffron);}
-  .mp-slot{display:flex; gap:10px; align-items:flex-start; padding:8px 14px; border-bottom:1px dashed var(--line); font-size:13.5px;}
-  .mp-slot:last-child{border-bottom:none;}
-  .mp-slot .slot-label{font-family:'IBM Plex Mono',monospace; font-size:11px; text-transform:uppercase; color:var(--text-dim); width:74px; flex-shrink:0; padding-top:3px;}
-  .mp-slot .slot-body{flex:1;}
-  .mp-meal{display:flex; justify-content:space-between; gap:8px; align-items:center; padding:3px 0;}
-  .mp-meal .mm-note{font-size:11.5px; color:var(--text-dim);}
-
-  /* Expiring soon */
-  .exp-group-label{font-family:'IBM Plex Mono',monospace; font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--warn); margin:12px 0 6px;}
-  .exp-group-label.later{color:var(--saffron);}
-  .exp-item{display:flex; justify-content:space-between; gap:8px; align-items:center; padding:6px 0; border-bottom:1px solid var(--line); font-size:13.5px; flex-wrap:wrap;}
-  .exp-item:last-child{border-bottom:none;}
-
-  /* Quick feedback tags */
-  .qf-chip{border:1px solid var(--line); background:var(--card-raised); color:var(--text-dim); padding:4px 10px; border-radius:999px; font-size:12px; cursor:pointer;}
-  .qf-chip:hover{border-color:var(--saffron-dim);}
-  .qf-chip.on{background:var(--saffron); border-color:var(--saffron); color:#1F2421; font-weight:600;}
-  .cookbook-tools{margin-top:16px; align-items:center;}
-  .cookbook-tools select{width:auto; min-width:150px;}
-  .cookbook-card{position:relative;}
-  .cookbook-badges{display:flex; flex-wrap:wrap; gap:6px; margin:9px 0;}
-  .cookbook-badge{font:11px 'IBM Plex Mono',monospace; padding:4px 7px; border:1px solid var(--line); border-radius:20px; color:var(--text-dim);}
-  .cookbook-comment{padding:10px 12px; background:var(--card-raised); border-left:3px solid var(--saffron); margin:9px 0; font-size:13px;}
-  .cookbook-photo{width:100%; max-height:260px; object-fit:cover; border-radius:10px; margin-top:10px;}
-  .stat-tile{padding:10px 14px; border:1px solid var(--line); border-radius:10px; min-width:100px;}
-  .stat-tile b{display:block; font-size:20px;}
-  dialog{border:1px solid var(--line); border-radius:var(--radius); background:var(--card); color:var(--text); padding:24px; max-width:620px; width:calc(100% - 32px);}
-  dialog::backdrop{background:rgba(0,0,0,.6);}
-
-  .sl-category-label{font-family:'IBM Plex Mono', monospace; font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--saffron); margin:14px 0 6px; border-top:1px solid var(--line); padding-top:10px;}
-  .sl-category-label:first-child{border-top:none; margin-top:0; padding-top:0;}
-  #barcodeVideoWrap{position:relative; max-width:420px;}
-  #barcodeVideo{width:100%; border-radius:8px; border:1px solid var(--line);}
-  .source-note{font-size:11px; color:var(--text-dim); font-family:'IBM Plex Mono',monospace;}
-
-  @media print{
-    body *{visibility:hidden;}
-    #printArea, #printArea *{visibility:visible;}
-    #printArea{position:absolute; top:0; left:0; width:100%; color:#000; background:#fff;}
-  }
-</style>
-</head>
-<body>
-
-<!-- AUTH SCREEN -->
-<div id="authScreen" class="wrap" style="padding-top:60px; max-width:420px;">
-  <div class="eyebrow" style="font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:0.14em; text-transform:uppercase; color:var(--saffron); margin-bottom:6px;">Kook vir Jou</div>
-  <h1 style="margin-bottom:20px;">Sign in</h1>
-  <div class="panel">
-    <div id="authError"></div>
-    <label class="field-label" for="authEmail">Email</label>
-    <input type="email" id="authEmail" autocomplete="email">
-    <label class="field-label" for="authPassword">Password</label>
-    <input type="password" id="authPassword" autocomplete="current-password">
-    <div class="row" style="margin-top:20px;">
-      <button class="btn" id="signInBtn" type="button">Sign in</button>
-      <button class="btn ghost" id="signUpBtn" type="button">Create account</button>
-    </div>
-    <div class="hint">First time: enter an email and password, then tap Create account. If email confirmation is switched on for this project, check your inbox before signing in.</div>
-  </div>
-</div>
-
-<!-- APP SHELL -->
-<div id="appShell" class="hidden">
-  <header class="top">
-    <div>
-      <div class="eyebrow">Kook vir Jou / recipe finder</div>
-      <h1>What's in the pot tonight?</h1>
-    </div>
-    <div class="user-chip"><span id="userEmail"></span><button id="signOutBtn" type="button">Sign out</button></div>
-  </header>
-
-  <nav class="tabs">
-    <button data-tab="recipes" class="active">New recipes</button>
-    <button data-tab="favourites">My Cookbook</button>
-    <button data-tab="koskas">Koskas</button>
-    <button data-tab="plan">Meal plan</button>
-    <button data-tab="shopping">Shopping</button>
-    <button data-tab="profile">Profile &amp; shops</button>
-  </nav>
-
-  <div class="wrap">
-
-    <!-- Expiring soon: shown on app start, above whatever tab is active -->
-    <section class="panel hidden" id="expiringPanel">
-      <h2>Expiring soon</h2>
-      <div class="sub">In-app reminder based on the expiry dates in your Koskas. These appear when you open the app — this is not a background push notification.</div>
-      <div id="expiringBody"></div>
-      <div class="row" style="margin-top:14px;">
-        <button class="btn ghost small" id="enableRemindersBtn" type="button">Enable expiry reminders</button>
-        <span class="hint" id="remindersStatus" style="margin-top:0;"></span>
-      </div>
-    </section>
-
-    <!-- TAB: RECIPES (wizard) -->
-    <section id="tabRecipes">
-      <section class="panel" data-step="1">
-        <h2>What are you in the mood for?</h2>
-        <div class="sub">Pick as many as fit, or just describe it below.</div>
-        <div class="chip-grid" id="cuisineChips"></div>
-        <label class="field-label" for="cuisineFree">Anything more specific</label>
-        <input type="text" id="cuisineFree" placeholder="e.g. something with the leftover roast chicken">
-      </section>
-
-      <section class="panel">
-        <h2>Ingredients on hand</h2>
-        <div class="sub">Optional. It'll build around these where it can.</div>
-        <div class="row">
-          <input type="text" id="onHandInput" placeholder="e.g. tinned tomatoes — press enter to add" style="flex:1;">
-          <button class="btn ghost small" id="onHandAdd" type="button">Add</button>
-        </div>
-        <div class="taglist" id="onHandList" style="margin-top:10px;"></div>
-      </section>
-
-      <section class="panel">
-        <h2>Details</h2>
-        <label class="field-label">Number of recipes</label>
-        <div class="stepper"><button type="button" id="recipeMinus">−</button><span class="val measure" id="recipeCountVal">3</span><button type="button" id="recipePlus">+</button></div>
-        <label class="field-label">Servings</label>
-        <div class="stepper"><button type="button" id="servingsMinus">−</button><span class="val measure" id="servingsVal">2</span><button type="button" id="servingsPlus">+</button></div>
-        <label class="field-label">Units</label>
-        <div class="row" id="unitsToggle">
-          <button type="button" class="chip selected" data-unit="metric">Metric (g, ml, °C)</button>
-          <button type="button" class="chip" data-unit="us">US (cups, oz, °F)</button>
-        </div>
-        <div class="hint" id="profileHint" style="margin-top:16px;"></div>
-      </section>
-
-      <div id="genErrorBox"></div>
-      <section class="panel">
-        <h2>Smart generation mode</h2>
-        <select id="smartGenerationMode">
-          <option value="standard">Best match for my request</option><option value="use_it">Use it or lose it</option><option value="pantry">Pantry-only challenge</option><option value="remix">Remix a favourite</option><option value="forgotten">Something we have not eaten recently</option><option value="everyone">Everyone will like this</option><option value="cheapest">Cheapest possible dinner</option><option value="rescue">20-minute rescue meal</option><option value="batch">Batch-cook Sunday</option><option value="leftovers">Transform leftovers</option>
-        </select>
-      </section>
-      <button class="btn block" id="generateBtn" type="button">Generate recipes</button>
-
-      <section class="panel hidden" id="loadingPanel">
-        <div class="loading-block"><div class="spinner"></div><div>Working out what to cook, and learning from your past ratings…</div></div>
-      </section>
-
-      <div id="resultsBody" style="margin-top:20px;"></div>
-    </section>
-
-    <!-- TAB: KOSKAS (pantry / stock register) -->
-    <section id="tabKoskas" class="hidden">
-      <section class="panel">
-        <h2>Add by photo</h2>
-        <div class="sub">Take one photo of a shelf or a few items. It proposes a list, nothing is saved until you confirm each line, quantities and expiry dates are its best guess, not a reading.</div>
-        <input type="file" id="pantryPhotoInput" accept="image/*" capture="environment">
-        <div id="pantryScanStatus" class="hint"></div>
-        <div id="pantryScanResults" style="margin-top:14px;"></div>
-      </section>
-
-      <section class="panel">
-        <h2>Add by barcode</h2>
-        <div class="sub">Scan a packaged item's barcode (or type it in) and it looks the product up on Open Food Facts, a public product database. Name, size, ingredients, allergens and nutrition come from that database, not from AI guesses. You confirm before anything saves.</div>
-        <div class="row">
-          <button class="btn ghost small" id="barcodeScanBtn" type="button">Scan with camera</button>
-          <input type="text" id="barcodeManualInput" placeholder="or type barcode, e.g. 5390003014636" inputmode="numeric" style="flex:1; min-width:180px;">
-          <button class="btn ghost small" id="barcodeLookupBtn" type="button">Look up</button>
-        </div>
-        <div id="barcodeVideoWrap" class="hidden" style="margin-top:12px;">
-          <video id="barcodeVideo" autoplay muted playsinline></video>
-          <div class="row" style="margin-top:8px;"><button class="btn ghost small" id="barcodeStopBtn" type="button">Stop camera</button></div>
-        </div>
-        <div id="barcodeStatus" class="hint"></div>
-        <div id="barcodeResult" style="margin-top:14px;"></div>
-      </section>
-
-      <section class="panel">
-        <h2>Add manually</h2>
-        <div class="row">
-          <input type="text" id="manItemName" placeholder="Item name" style="flex:2;">
-          <input type="number" id="manItemQty" placeholder="Qty" step="0.1" min="0" style="width:80px;">
-          <input type="text" id="manItemUnit" placeholder="unit" style="width:80px;">
-        </div>
-        <div class="row" style="margin-top:10px;">
-          <input type="number" id="manItemPar" placeholder="Always keep at least…" step="0.1" min="0" style="flex:1;">
-          <input type="text" id="manItemExpiry" placeholder="yyyy-mm-dd (optional)" style="width:150px;">
-          <label style="font-size:12.5px; display:flex; align-items:center; gap:6px;"><input type="checkbox" id="manItemTrack"> track use in recipes</label>
-        </div>
-        <button class="btn ghost small" id="manItemAdd" type="button" style="margin-top:12px;">Add item</button>
-      </section>
-
-      <section class="panel" id="shoppingNeededPanel" style="display:none;">
-        <h2>Running low</h2>
-        <div class="sub">Pantry items at or below their "keep at least" level. Send them to a shopping list under the Shopping tab, where you can edit the list, pick a shop and fulfilment, share it to WhatsApp or print it.</div>
-        <div id="shoppingNeededList"></div>
-        <button class="btn ghost small" id="lowStockToListBtn" type="button" style="margin-top:12px;">Add these to a shopping list</button>
-      </section>
-
-      <section class="panel">
-        <h2>Stock</h2>
-        <div id="pantryList"></div>
-      </section>
-
-      <section class="panel">
-        <h2>Leftovers</h2>
-        <div id="leftoversList"></div>
-      </section>
-    </section>
-
-    <!-- TAB: SMART COOKBOOK -->
-    <section id="tabFavourites" class="hidden">
-      <section class="panel">
-        <div class="row" style="justify-content:space-between; align-items:flex-start;">
-          <div><h2>My Cookbook</h2><div class="sub">Every saved recipe, cook, rating and kitchen note in one place.</div></div>
-          <button class="btn small" id="cookbookSurprise" type="button">Surprise me</button>
-        </div>
-        <div class="row cookbook-tools">
-          <input id="cookbookSearch" type="search" placeholder="Search recipes, comments or ingredients…" style="flex:2; min-width:220px;">
-          <select id="cookbookStatus"><option value="">All recipes</option><option value="cooked">Cooked</option><option value="want_to_try">Want to try</option><option value="make_again">Make again</option><option value="avoid">Avoid next time</option><option value="favourite">Favourites</option></select>
-          <select id="cookbookSort"><option value="recent">Most recent</option><option value="rating">Highest rated</option><option value="cooked">Most cooked</option><option value="fast">Fastest</option><option value="cheap">Cheapest</option><option value="forgotten">Longest since cooked</option></select>
-          <label class="hint"><input id="cookbookPantryOnly" type="checkbox"> Can cook now</label>
-        </div>
-        <div class="row" id="cookbookStats"></div>
-      </section>
-      <section class="panel" id="kitchenDashboard"><h2>This week in your kitchen</h2><div id="kitchenDashboardBody"></div></section>
-      <section class="panel">
-        <div class="row" style="justify-content:space-between;"><h2>Collections</h2><button class="btn ghost small" id="newCollectionBtn" type="button">+ Collection</button></div>
-        <div class="taglist" id="collectionChips"></div>
-      </section>
-      <div id="favouritesBody"></div>
-    </section>
-
-    <!-- TAB: MEAL PLAN -->
-    <section id="tabPlan" class="hidden">
-      <section class="panel">
-        <div class="row" style="justify-content:space-between;">
-          <h2 id="mpWeekTitle">Meal plan</h2>
-          <div class="row">
-            <button class="btn ghost small" id="mpPrevWeek" type="button">← Prev</button>
-            <button class="btn ghost small" id="mpThisWeek" type="button">This week</button>
-            <button class="btn ghost small" id="mpNextWeek" type="button">Next →</button>
-          </div>
-        </div>
-        <div class="sub" style="margin-top:8px;">Monday to Sunday. Add favourites, freshly generated recipes, or manual meals. Tick meals and build a shopping list from the day, the week, or just the ticked ones.</div>
-        <div class="row" style="margin-bottom:16px;">
-          <button class="btn ghost small" id="mpListWeekBtn" type="button">Shopping list: whole week</button>
-          <button class="btn ghost small" id="mpListSelectedBtn" type="button">Shopping list: ticked meals</button>
-        </div>
-        <div id="mpGrid"></div>
-      </section>
-    </section>
-
-    <!-- TAB: SHOPPING / ORDER MODE -->
-    <section id="tabShopping" class="hidden">
-      <section class="panel" id="slOverviewPanel">
-        <h2>Shopping lists</h2>
-        <div class="sub">Saved for the whole household — they survive reloads and both of you see the same lists. Kook vir Jou can compare supported retailer products and hand a selected list to Pepesto. Retailer login, substitutions, delivery slots and final payment remain under your control.</div>
-        <div class="row">
-          <input type="text" id="newListTitle" placeholder="New list name, e.g. Weekly shop" style="flex:1;">
-          <button class="btn small" id="newListBtn" type="button">Create list</button>
-        </div>
-        <div id="slListCards" style="margin-top:16px;"></div>
-      </section>
-
-      <section class="panel hidden" id="slDetailPanel">
-        <div class="row" style="justify-content:space-between;">
-          <h2 id="slDetailTitle">List</h2>
-          <button class="btn ghost small" id="slBackBtn" type="button">← All lists</button>
-        </div>
-        <div class="sub" id="slDetailSub"></div>
-
-        <label class="field-label">Fulfilment</label>
-        <div class="chip-grid" id="slFulfilChips">
-          <button type="button" class="chip" data-fm="delivery">Delivery</button>
-          <button type="button" class="chip" data-fm="click_collect">Click &amp; Collect</button>
-          <button type="button" class="chip" data-fm="in_store">In-store shopping</button>
-          <button type="button" class="chip" data-fm="whatsapp">WhatsApp list only</button>
-        </div>
-
-        <label class="field-label" for="slRetailerSelect">Retailer</label>
-        <select id="slRetailerSelect"></select>
-        <div id="slRetailerInfo" class="hint"></div>
-
-        <label class="field-label">Items</label>
-        <div class="hint" style="margin-bottom:8px;">Tap the status pill to cycle: required → optional → check pantry → already have → bought. Notes are for substitutions, e.g. "gluten-free pasta only".</div>
-        <div id="slItems"></div>
-        <div class="row" style="margin-top:12px;">
-          <input type="text" id="slExtraInput" placeholder="Add an item" style="flex:1;">
-          <button class="btn ghost small" id="slExtraAdd" type="button">Add</button>
-          <button class="btn ghost small" id="slAddLowStockBtn" type="button">Add low-stock items</button>
-        </div>
-
-        <section class="pepesto-section" aria-labelledby="pepestoHeading">
-          <h3 id="pepestoHeading">Compare supermarket baskets</h3>
-          <div class="hint">Compare this list at Tesco, Dunnes and SuperValu. Prices, local stock, loyalty discounts, delivery charges and final availability may change after retailer login.</div>
-          <div class="row" style="margin-top:12px;">
-            <button class="btn small" id="pepestoCompareBtn" type="button">Compare Tesco, Dunnes &amp; SuperValu</button>
-            <button class="btn ghost small hidden" id="pepestoRefreshBtn" type="button">Refresh prices</button>
-            <span class="hint" id="pepestoCostEstimate" style="margin-top:0;"></span>
-          </div>
-          <div id="pepestoResults" class="pepesto-grid" aria-live="polite"></div>
-          <div class="hint" style="margin-top:12px;">Product matching is not an allergen guarantee. Always check the actual product label, especially for Coeliac / gluten-free requirements.</div>
-        </section>
-
-        <label class="field-label">Share / export</label>
-        <div class="row">
-          <button class="btn ghost small" id="slWhatsAppBtn" type="button">Send to WhatsApp</button>
-          <button class="btn ghost small" id="slPrintBtn" type="button">Print</button>
-          <button class="btn ghost small" id="slCopyBtn" type="button">Copy to clipboard</button>
-          <button class="btn ghost small" id="slDownloadBtn" type="button">Download .txt</button>
-        </div>
-        <div class="row" style="margin-top:10px;" id="slRetailerLinkRow"></div>
-
-        <div class="row" style="margin-top:20px; border-top:1px solid var(--line); padding-top:16px;">
-          <button class="btn small" id="slCompleteBtn" type="button">Mark completed</button>
-          <button class="btn ghost small" id="slReopenBtn" type="button">Reopen</button>
-          <button class="btn ghost small" id="slDeleteBtn" type="button" style="color:var(--warn);">Delete list</button>
-        </div>
-      </section>
-    </section>
-
-    <!-- TAB: PROFILE & SHOPS -->
-    <section id="tabProfile" class="hidden">
-      <section class="panel">
-        <h2>Household</h2>
-        <div class="sub">Anyone who joins with this code shares the same address, shops, recipes and favourites. Ratings stay per-person so it can still tell your taste from theirs.</div>
-        <div class="row">
-          <span class="measure" id="inviteCodeText" style="font-size:18px; color:var(--saffron);"></span>
-          <button class="btn ghost small" id="copyInviteBtn" type="button">Copy invite code</button>
-        </div>
-        <div id="inviteStatus" class="hint"></div>
-        <label class="field-label" for="joinCodeInput">Have someone else's code?</label>
-        <div class="row">
-          <input type="text" id="joinCodeInput" placeholder="8-character code" style="flex:1;">
-          <button class="btn ghost small" id="joinHouseholdBtn" type="button">Join their household</button>
-        </div>
-        <div id="joinStatus" class="hint"></div>
-      </section>
-
-      <section class="panel">
-        <h2>Your goals</h2>
-        <div class="sub">Personal to your login, not shared with the household. When set, recipe suggestions lean toward these, e.g. higher protein if bulking, calorie-aware if cutting.</div>
-        <label class="field-label" for="goalWeightInput">Weight goal (optional)</label>
-        <input type="text" id="goalWeightInput" placeholder="e.g. lose 5kg, maintain, bulk +3kg">
-        <label class="field-label" for="goalTrainingInput">Training / activity goal (optional)</label>
-        <input type="text" id="goalTrainingInput" placeholder="e.g. marathon training, strength 3x/week">
-        <label class="field-label" for="goalNotesInput">Anything else to factor in</label>
-        <textarea id="goalNotesInput" placeholder="e.g. high protein, avoid heavy dinners before training days"></textarea>
-        <button class="btn ghost small" id="saveGoalsBtn" type="button" style="margin-top:12px;">Save goals</button>
-      </section>
-
-      <section class="panel">
-        <h2>Delivery address</h2>
-        <div class="sub">Used to find shops within delivery range and to centre the map search.</div>
-        <label class="field-label" for="addrInput">Address</label>
-        <textarea id="addrInput" placeholder="House/street, area, city"></textarea>
-        <label class="field-label" for="eircodeInput">Eircode</label>
-        <input type="text" id="eircodeInput" placeholder="e.g. D14 E6P2">
-        <div id="geocodeStatus" class="hint"></div>
-        <button class="btn ghost small" id="saveAddrBtn" type="button" style="margin-top:14px;">Save address</button>
-      </section>
-
-      <section class="panel">
-        <h2>Allergies &amp; diet</h2>
-        <label class="field-label">Avoid entirely</label>
-        <div class="chip-grid" id="profAllergyChips"></div>
-        <label class="field-label">Diet</label>
-        <div class="chip-grid" id="profDietChips"></div>
-        <button class="btn ghost small" id="saveDietBtn" type="button">Save</button>
-      </section>
-
-      <section class="panel">
-        <h2>Shops</h2>
-        <div class="sub">Pin the ones you always want considered. Save your address to find shops within 20km.</div>
-        <button class="btn ghost small" id="findShopsBtn" type="button">Find shops within 20km</button>
-        <div id="mapsStatus" class="hint"></div>
-        <label class="field-label">Your shops</label>
-        <div class="chip-grid" id="shopChips"></div>
-        <div class="row" style="margin-top:10px;">
-          <input type="text" id="shopManualInput" placeholder="Add a shop by name" style="flex:1;">
-          <button class="btn ghost small" id="shopManualAdd" type="button">Add</button>
-        </div>
-      </section>
-    </section>
-
-  </div>
-</div>
-
-<!-- COOKING MODE -->
-<div id="cookingOverlay" class="hidden">
-  <div class="ck-top">
-    <div><div id="ckTitle" style="font-family:'Fraunces',serif; font-size:16px;"></div><span class="wake-badge" id="wakeBadge">screen lock: on</span></div>
-    <button class="btn ghost small" id="exitCookingBtn" type="button">Exit</button>
-  </div>
-  <div class="ck-body">
-    <div class="ck-stepnum" id="ckStepNum"></div>
-    <div class="ck-text" id="ckText"></div>
-    <div class="ck-timer hidden" id="ckTimer"></div>
-    <div class="row" id="ckTimerControls" style="margin-top:16px;"></div>
-    <div class="row" style="margin-top:16px;"><button class="btn ghost small" id="ckReadBtn" type="button">🔊 Read step</button><button class="btn ghost small" id="ckVoiceBtn" type="button">🎙 Voice control</button></div>
-  </div>
-  <div class="ck-nav">
-    <button class="btn ghost" id="ckPrevBtn" type="button">Back</button>
-    <button class="btn" id="ckNextBtn" type="button">Next</button>
-  </div>
-</div>
-
-<!-- LEFTOVER MODAL -->
-<div id="leftoverModal" class="hidden">
-  <div class="modal-inner">
-    <h3 style="margin-bottom:16px;">Any leftovers?</h3>
-    <div class="chip-grid" id="leftoverChips">
-      <button type="button" class="chip" data-amt="none">None</button>
-      <button type="button" class="chip" data-amt="a little">A little</button>
-      <button type="button" class="chip" data-amt="a portion">A portion</button>
-      <button type="button" class="chip" data-amt="several portions">Several portions</button>
-    </div>
-    <div class="row">
-      <button class="btn ghost" id="skipLeftoverBtn" type="button">Skip</button>
-    </div>
-  </div>
-</div>
-
-<!-- STOCK DEDUCTION REVIEW MODAL -->
-<div id="deductModal" class="hidden">
-  <div class="modal-inner">
-    <h3 style="margin-bottom:6px;">Stock changes to apply</h3>
-    <div class="hint" style="margin-bottom:14px;">Only pantry items marked "track use in recipes" are considered. Untick anything you don't want deducted — nothing changes until you apply, and you can undo afterwards.</div>
-    <div id="deductRows"></div>
-    <div id="deductNoneMsg" class="hint hidden">No tracked pantry items match this recipe's ingredients, so there's nothing to deduct.</div>
-    <div class="row" style="margin-top:16px;">
-      <button class="btn" id="deductApplyBtn" type="button">Apply changes</button>
-      <button class="btn ghost" id="deductCancelBtn" type="button">Skip</button>
-    </div>
-  </div>
-</div>
-
-<!-- ADD MEAL MODAL -->
-<div id="mealModal" class="hidden">
-  <div class="modal-inner">
-    <h3 style="margin-bottom:6px;" id="mealModalTitle">Add meal</h3>
-    <div class="hint" id="mealModalSub" style="margin-bottom:14px;"></div>
-    <label class="field-label" for="mealRecipeSelect">Recipe</label>
-    <select id="mealRecipeSelect"></select>
-    <label class="field-label" for="mealManualInput">Or a manual meal</label>
-    <input type="text" id="mealManualInput" placeholder="e.g. Toasties and soup">
-    <label class="field-label" for="mealLeftoverSelect">Or use logged leftovers</label>
-    <select id="mealLeftoverSelect"></select>
-    <label class="field-label" for="mealServings">Servings</label>
-    <input type="number" id="mealServings" min="1" max="12" value="2" style="width:90px;">
-    <label style="font-size:12.5px; display:flex; align-items:center; gap:6px; margin-top:14px;">
-      <input type="checkbox" id="mealCookTwice"> Cook once, eat twice (adds a leftovers meal the next day, same slot)
-    </label>
-    <label class="field-label" for="mealNotes">Notes</label>
-    <input type="text" id="mealNotes" placeholder="optional">
-    <div class="row" style="margin-top:16px;">
-      <button class="btn" id="mealSaveBtn" type="button">Add to plan</button>
-      <button class="btn ghost" id="mealCancelBtn" type="button">Cancel</button>
-    </div>
-  </div>
-</div>
-
-<!-- RATING MODAL -->
-<div id="ratingModal" class="hidden">
-  <div class="modal-inner">
-    <h3 style="margin-bottom:16px;">Rate this recipe</h3>
-    <div id="starRows"></div>
-    <label class="field-label">Quick tags</label>
-    <div class="chip-grid" id="ratingQuickTags" style="margin-bottom:4px;"></div>
-    <label class="field-label" for="ratingComment">Comment</label>
-    <textarea id="ratingComment" placeholder="e.g. next time double the chorizo"></textarea>
-    <div class="row" style="margin-top:16px;">
-      <button class="btn" id="saveRatingBtn" type="button">Save rating</button>
-      <button class="btn ghost" id="cancelRatingBtn" type="button">Cancel</button>
-    </div>
-  </div>
-</div>
-
-<dialog id="cookLogDialog">
-  <form method="dialog" id="cookLogForm">
-    <h3 id="cookLogTitle">Log this cook</h3>
-    <div class="row"><label>Servings made <input id="cookServingsMade" type="number" min="1" step="1" value="2"></label><label>Servings eaten <input id="cookServingsEaten" type="number" min="0" step="1" value="2"></label></div>
-    <div class="row"><label>Actual minutes <input id="cookActualMinutes" type="number" min="0"></label><label>Actual cost € <input id="cookActualCost" type="number" min="0" step=".01"></label></div>
-    <label class="field-label">How was it?</label><div class="row" id="cookStars"></div>
-    <label class="field-label">What would you change?</label><textarea id="cookComment" placeholder="e.g. double the sauce next time"></textarea>
-    <label class="field-label">Substitutions</label><input id="cookSubstitutions" type="text" placeholder="e.g. yoghurt instead of cream">
-    <div class="row" style="margin-top:12px;"><label><input id="cookAgain" type="checkbox"> Make again</label><label><input id="cookTimeAccurate" type="checkbox"> Time was accurate</label><label><input id="cookPortionsEnough" type="checkbox"> Portions were enough</label></div>
-    <label class="field-label">Optional photo (max 5 MB)</label><input id="cookPhoto" type="file" accept="image/jpeg,image/png,image/webp">
-    <div class="row" style="margin-top:16px;"><button class="btn" id="saveCookLog" type="button">Save cook</button><button class="btn ghost" value="cancel">Cancel</button></div>
-  </form>
-</dialog>
-
-<dialog id="versionDialog">
-  <form method="dialog">
-    <h3>Save our version</h3>
-    <label class="field-label">Version name</label><input id="versionName" placeholder="e.g. Armand's extra-garlic version">
-    <label class="field-label">Ingredients (one per line)</label><textarea id="versionIngredients" rows="8"></textarea>
-    <label class="field-label">Steps (one per line)</label><textarea id="versionSteps" rows="8"></textarea>
-    <label class="field-label">Notes</label><textarea id="versionNotes"></textarea>
-    <label><input id="versionPreferred" type="checkbox"> Use as our preferred version</label>
-    <div class="row" style="margin-top:16px;"><button class="btn" id="saveVersion" type="button">Save version</button><button class="btn ghost" value="cancel">Cancel</button></div>
-  </form>
-</dialog>
-
-<div id="printArea" class="hidden"></div>
-
-<footer class="note">
-  Cost, calorie and protein figures marked * are AI estimates, not measured values; figures from your saved prices or from Open Food Facts are labelled with their source. The allergy warnings in this app are a best-effort keyword check, not a certified allergen check — it can miss hidden ingredients and flag harmless ones. Always check the actual product label, especially for Coeliac / gluten-free requirements. Photo-scanned pantry items are the AI's best guess at what's in the picture; nothing saves without your confirmation. Kook vir Jou can compare supported retailer products and hand the selected list to Pepesto's checkout process. Retailer login, delivery-slot selection, substitutions, loyalty pricing, product-label verification and final payment remain under your control.
-</footer>
-
-<script type="module">
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.110.5';
 import { PEPESTO_RETAILERS, PEPESTO_ESTIMATED_PRICES_EUR, rankComparisonResults, cheapestCompleteDomain, createRequestGate, settleRetailerComparisons, validHandoffUrl } from './pepesto-helpers.js';
+import { exportAccountData, leaveHousehold } from './account-tools.js';
+import { installClientMonitoring, loadUsageSummary } from './monitoring.js';
+import { subscribeToHousehold } from './realtime.js';
 import {
   CATEGORY_ORDER, categorizeIngredient, getItemCategory,
   normalizeIngredientName, namesMatch, unitToBase, convertUnits,
@@ -710,6 +37,8 @@ function el(tag, attrs, children){
 }
 
 let session = null, profile = null, household = null, shops = [], ingredientPrices = {}, pantryItems = [], leftovers = [];
+let unsubscribeRealtime = null;
+const reportClientError = installClientMonitoring(supabase, () => !!session?.user);
 let lastDeduction = [];
 let shoppingLists = [], currentList = null, currentListItems = [];
 const pepestoResultsByList = new Map();
@@ -722,10 +51,34 @@ const state = {
   currentResults: null
 };
 
+// Shared accessible-dialog behavior for all modal overlays.
+const dialogCloseButtons = {leftoverModal:'skipLeftoverBtn',deductModal:'deductCancelBtn',mealModal:'mealCancelBtn',ratingModal:'cancelRatingBtn'};
+let dialogReturnFocus = null;
+Object.keys(dialogCloseButtons).forEach(id => {
+  const dialog=document.getElementById(id);
+  new MutationObserver(() => {
+    if(!dialog.classList.contains('hidden')){
+      dialogReturnFocus=document.activeElement;
+      requestAnimationFrame(() => dialog.querySelector('button,input,select,textarea,[tabindex]:not([tabindex="-1"])')?.focus());
+    } else if(dialogReturnFocus instanceof HTMLElement){ dialogReturnFocus.focus(); dialogReturnFocus=null; }
+  }).observe(dialog,{attributes:true,attributeFilter:['class']});
+  dialog.addEventListener('keydown', e => {
+    if(e.key==='Escape'){ document.getElementById(dialogCloseButtons[id])?.click(); return; }
+    if(e.key!=='Tab') return;
+    const focusable=[...dialog.querySelectorAll('button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),a[href],[tabindex]:not([tabindex="-1"])')];
+    if(!focusable.length) return; const first=focusable[0],last=focusable.at(-1);
+    if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
+    else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
+  });
+});
+
 // ---------------- AUTH ----------------
 supabase.auth.onAuthStateChange((event, sess) => {
+  const previousUserId = session?.user?.id;
   session = sess;
-  if(sess){ showApp(); } else { showAuth(); }
+  if(sess){
+    if(!previousUserId || previousUserId !== sess.user.id || event === 'SIGNED_IN' || event === 'INITIAL_SESSION') showApp();
+  } else { showAuth(); }
 });
 
 document.getElementById('signInBtn').addEventListener('click', async () => {
@@ -743,7 +96,30 @@ document.getElementById('signUpBtn').addEventListener('click', async () => {
   if(error) box.appendChild(el('div', {class:'error-box', text: error.message}));
   else box.appendChild(el('div', {class:'ok-box', text:'Account created. If email confirmation is on, check your inbox, then sign in.'}));
 });
-document.getElementById('signOutBtn').addEventListener('click', async () => { await supabase.auth.signOut(); });
+document.getElementById('forgotPasswordBtn').addEventListener('click', async () => {
+  const email=document.getElementById('authEmail').value.trim(),box=document.getElementById('authError'); box.innerHTML='';
+  if(!email){box.appendChild(el('div',{class:'error-box',text:'Enter your email address first.'}));return;}
+  const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:window.location.origin});
+  box.appendChild(el('div',{class:error?'error-box':'ok-box',text:error?error.message:'Password-reset instructions have been sent if that account exists.'}));
+});
+document.getElementById('signOutBtn').addEventListener('click', async () => { unsubscribeRealtime?.(); unsubscribeRealtime=null; await supabase.auth.signOut(); });
+document.getElementById('exportAccountBtn').addEventListener('click', async () => {
+  const status=document.getElementById('accountActionStatus'); status.textContent='Preparing your export…';
+  try{await exportAccountData(supabase);status.textContent='Export downloaded.';}catch(err){status.textContent=err.message;reportClientError('account.export',err.message);}
+});
+document.getElementById('leaveHouseholdBtn').addEventListener('click', async () => {
+  if(!confirm('Leave this household? Shared data stays with its other members. You will be moved to a new private household.')) return;
+  const status=document.getElementById('accountActionStatus'); status.textContent='Leaving household…';
+  try{await leaveHousehold(supabase);location.reload();}catch(err){status.textContent=err.message;reportClientError('household.leave',err.message);}
+});
+document.getElementById('deleteAccountBtn').addEventListener('click', async () => {
+  if(!confirm('Permanently delete your account? Shared household data may remain for other members. This cannot be undone.')) return;
+  const typed=prompt('Type DELETE MY ACCOUNT to confirm permanent deletion.'); if(typed!=='DELETE MY ACCOUNT') return;
+  const status=document.getElementById('deleteAccountStatus'); status.textContent='Deleting account…';
+  const {data,error}=await supabase.functions.invoke('delete-account',{body:{confirmation:typed}});
+  if(error||!data?.deleted){status.textContent=data?.error||'Account deletion failed.';return;}
+  await supabase.auth.signOut(); location.reload();
+});
 
 function showAuth(){
   document.getElementById('authScreen').classList.remove('hidden');
@@ -760,6 +136,9 @@ async function showApp(){
     await loadIngredientPrices();
     await loadPantry();
     await loadFavourites();
+    await refreshUsageSummary();
+    unsubscribeRealtime?.();
+    unsubscribeRealtime=subscribeToHousehold(supabase,household.id,handleRealtimeChange);
     renderProfileTab();
     renderHouseholdTab();
     renderShopChips();
@@ -781,13 +160,33 @@ async function showApp(){
   }
 }
 
+async function refreshUsageSummary(){
+  const target=document.getElementById('usageSummary');
+  try{
+    const usage=await loadUsageSummary(supabase);
+    const counts=usage.events.reduce((a,e)=>(a[e.category]=(a[e.category]||0)+1,a),{});
+    const detail=Object.entries(counts).map(([k,v])=>`${k.replaceAll('_',' ')}: ${v}`).join(', ');
+    target.textContent=`Today: €${usage.total.toFixed(2)} estimated third-party usage${detail?` (${detail})`:''}.${usage.alerts.length?` ${usage.alerts.length} unacknowledged cost alert(s).`:''}`;
+  }catch{target.textContent='Usage summary is temporarily unavailable.';}
+}
+
+async function handleRealtimeChange(table){
+  if(table==='shopping_lists'||table==='shopping_list_items') await loadShoppingLists();
+  else if(table==='meal_plans'||table==='meal_plan_items') await loadMealPlan();
+  else if(table==='pantry_items'){await loadPantry();renderPantryList();}
+  else if(table==='leftovers') await loadLeftovers();
+  else if(table==='usage_alerts') await refreshUsageSummary();
+}
+
 // ---------------- PROFILE ----------------
 async function loadProfile(){
-  let { data } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
+  let { data, error } = await supabase.from('profiles').select('id,units_preference,goals').eq('id', session.user.id).maybeSingle();
+  if(error) throw new Error('Your profile could not be loaded.');
   if(!data){
     // trigger may not have fired yet on brand-new signup, retry once
     await new Promise(r => setTimeout(r, 1200));
-    ({ data } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle());
+    ({ data, error } = await supabase.from('profiles').select('id,units_preference,goals').eq('id', session.user.id).maybeSingle());
+    if(error) throw new Error('Your profile could not be loaded.');
   }
   profile = data || { id: session.user.id, units_preference:'metric', goals:{} };
   state.units = profile.units_preference || 'metric';
@@ -812,21 +211,27 @@ document.getElementById('saveGoalsBtn').addEventListener('click', async () => {
 
 // ---------------- HOUSEHOLD (shared between everyone who joins with the invite code) ----------------
 async function loadHousehold(){
-  let { data: membership } = await supabase.from('household_members').select('household_id, role').eq('user_id', session.user.id).maybeSingle();
+  let { data: membership, error: membershipError } = await supabase.from('household_members').select('household_id, role').eq('user_id', session.user.id).maybeSingle();
+  if(membershipError) throw new Error('Your household membership could not be loaded.');
   if(!membership){
     await new Promise(r => setTimeout(r, 1500));
-    ({ data: membership } = await supabase.from('household_members').select('household_id, role').eq('user_id', session.user.id).maybeSingle());
+    ({ data: membership, error: membershipError } = await supabase.from('household_members').select('household_id, role').eq('user_id', session.user.id).maybeSingle());
+    if(membershipError) throw new Error('Your household membership could not be loaded.');
   }
   if(!membership){
     await new Promise(r => setTimeout(r, 2500));
-    ({ data: membership } = await supabase.from('household_members').select('household_id, role').eq('user_id', session.user.id).maybeSingle());
+    ({ data: membership, error: membershipError } = await supabase.from('household_members').select('household_id, role').eq('user_id', session.user.id).maybeSingle());
+    if(membershipError) throw new Error('Your household membership could not be loaded.');
   }
   if(!membership){
     document.getElementById('profileHint').innerHTML = '';
     document.getElementById('profileHint').appendChild(el('div', {class:'error-box', text:'Your household record hasn\'t appeared yet, this can happen right after signing up. Try refreshing the page in a moment.'}));
     throw new Error('No household membership found for this account yet.');
   }
-  const { data: h } = await supabase.from('households').select('*').eq('id', membership.household_id).single();
+  const { data: h, error: householdError } = await supabase.from('households')
+    .select('id,invite_code,allergies,diets,delivery_address,delivery_eircode,delivery_lat,delivery_lon')
+    .eq('id', membership.household_id).single();
+  if(householdError || !h) throw new Error('Your household could not be loaded.');
   household = h;
   document.getElementById('addrInput').value = household.delivery_address || '';
   document.getElementById('eircodeInput').value = household.delivery_eircode || '';
@@ -1062,13 +467,21 @@ async function saveIngredientPrice(name, unit, price){
 // ---------------- TABS ----------------
 document.querySelectorAll('.tabs button').forEach(btn => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tabs button').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-selected','false'); });
     btn.classList.add('active');
+    btn.setAttribute('aria-selected','true');
     ['recipes','favourites','koskas','plan','shopping','profile'].forEach(t => document.getElementById('tab'+t[0].toUpperCase()+t.slice(1)).classList.toggle('hidden', t !== btn.dataset.tab));
     if(btn.dataset.tab === 'favourites') loadFavourites();
     if(btn.dataset.tab === 'koskas'){ loadPantry(); loadLeftovers(); }
     if(btn.dataset.tab === 'plan') loadMealPlan();
     if(btn.dataset.tab === 'shopping') loadShoppingLists();
+  });
+  btn.addEventListener('keydown', e => {
+    if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key)) return;
+    e.preventDefault();
+    const tabs=[...document.querySelectorAll('.tabs button')], i=tabs.indexOf(btn);
+    const next=e.key==='Home'?0:e.key==='End'?tabs.length-1:(i+(e.key==='ArrowRight'?1:-1)+tabs.length)%tabs.length;
+    tabs[next].focus(); tabs[next].click();
   });
 });
 
@@ -1158,7 +571,7 @@ async function safeDb(query, friendlyMessage){
 function showToast(msg, isError){
   let t = document.getElementById('appToast');
   if(!t){
-    t = el('div', {id:'appToast', style:'position:fixed; bottom:20px; left:50%; transform:translateX(-50%); z-index:300; padding:10px 16px; border-radius:7px; font-size:13.5px; max-width:90vw;'});
+    t = el('div', {id:'appToast', role:'status', 'aria-live':'polite', style:'position:fixed; bottom:20px; left:50%; transform:translateX(-50%); z-index:300; padding:10px 16px; border-radius:7px; font-size:13.5px; max-width:90vw;'});
     document.body.appendChild(t);
   }
   t.style.background = isError ? 'var(--warn)' : 'var(--ok)';
@@ -1233,10 +646,6 @@ function buildPrompt(preferenceSummary){
   const allergyList = household.allergies || [];
   const dietList = household.diets || [];
   const shopList = shops.filter(s => s.selected).map(s => s.name);
-  const mode = document.getElementById('smartGenerationMode').value;
-  const modeBrief = {
-    standard:'Choose the best overall match.', use_it:'Aggressively prioritise ingredients expiring soon and minimise waste.', pantry:'Use only pantry/on-hand ingredients except basic salt, pepper, oil and water.', remix:'Preserve the qualities of a highly rated past dish but change its cuisine, protein or format.', forgotten:'Avoid recent meals and favour a style not cooked recently.', everyone:'Optimise for overlapping household ratings and avoid polarising past dishes.', cheapest:'Minimise total cost and cost per serving.', rescue:'Every recipe must realistically take 20 minutes or less.', batch:'Make freezer-friendly large-batch recipes with reheating guidance.', leftovers:'Transform logged leftovers into distinctly new meals.'
-  }[mode];
 
   return `You are a home cooking assistant with memory of this person's past ratings. Generate ${state.recipeCount} distinct recipe(s). Respond with ONLY valid JSON, no markdown fences, matching exactly this schema:
 
@@ -1256,7 +665,6 @@ function buildPrompt(preferenceSummary){
 }
 
 Brief:
-- Smart mode: ${modeBrief}
 - What they want: ${cuisineList.length ? cuisineList.join(', ') : 'no specific type, use your judgement'}
 - Must strictly avoid: ${allergyList.length ? allergyList.join(', ') : 'none stated'}
 - Diet: ${dietList.length ? dietList.join(', ') : 'none stated'}
@@ -1337,7 +745,17 @@ async function callClaudeForRecipes(prompt){
 }
 
 async function persistRecipes(parsed){
-  const rows = (parsed.recipes||[]).map(r => ({
+  if(!parsed || !Array.isArray(parsed.recipes) || parsed.recipes.length > 6) throw new Error('Recipe response has an invalid structure.');
+  const recipes = parsed.recipes.map((r, index) => {
+    if(!r || typeof r.title !== 'string' || !r.title.trim() || r.title.length > 200 ||
+      !Array.isArray(r.ingredients) || r.ingredients.length > 60 || !Array.isArray(r.steps) || r.steps.length > 12){
+      throw new Error(`Recipe ${index + 1} has invalid fields.`);
+    }
+    r.ingredients.forEach(ing => { if(!ing || typeof ing.item !== 'string' || !ing.item.trim() || ing.item.length > 200) throw new Error(`Recipe ${index + 1} has an invalid ingredient.`); });
+    r.steps.forEach(step => { if(!step || typeof step.text !== 'string' || !step.text.trim() || step.text.length > 2000) throw new Error(`Recipe ${index + 1} has an invalid step.`); });
+    return r;
+  });
+  const rows = recipes.map(r => ({
     household_id: household.id, title:r.title, description:r.description, cuisine:r.cuisine,
     total_time_minutes:r.totalTimeMinutes, servings:r.servings, ingredients:r.ingredients||[],
     steps:r.steps||[], allergen_note:r.allergenNote, shopping_note:r.shoppingNote, cost_estimate:null, is_favourite:false,
@@ -1420,15 +838,15 @@ function buildRecipeCard(r, onHandLower, isAlt){
         if(applied.length){
           const undoBtn = el('button', {class:'btn ghost small', type:'button', text:'Undo stock update'});
           undoBtn.addEventListener('click', async () => {
-            let failed = false;
-            for(const d of applied){
-              const { error } = await safeDb(supabase.from('pantry_items').update({ quantity: d.previousQuantity }).eq('id', d.id), 'Could not undo a stock change');
-              if(error){ failed = true; continue; }
+            const { error } = await safeDb(supabase.rpc('set_pantry_quantities', {p_changes:applied.map(d => ({id:d.id,quantity:d.previousQuantity}))}), 'Could not undo stock changes');
+            if(!error){
+              for(const d of applied){
               const item = pantryItems.find(p => p.id === d.id);
               if(item) item.quantity = d.previousQuantity;
+              }
             }
             renderPantryList(); renderShoppingNeeded(); renderExpiringPanel();
-            if(!failed){ showToast('Stock changes undone'); undoBtn.remove(); }
+            if(!error){ showToast('Stock changes undone'); undoBtn.remove(); }
           });
           actions.appendChild(undoBtn);
         }
@@ -1660,13 +1078,17 @@ document.getElementById('manItemAdd').addEventListener('click', async () => {
   document.getElementById('manItemTrack').checked = false;
 });
 
-function fileToBase64(file){
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result.split(',')[1]);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
+async function preparePantryPhoto(file){
+  if(!['image/jpeg','image/png','image/webp'].includes(file.type)) throw new Error('Choose a JPEG, PNG, or WebP photo.');
+  if(file.size > 12_000_000) throw new Error('The original photo is too large. Choose one under 12 MB.');
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement('canvas'); canvas.width = Math.max(1, Math.round(bitmap.width * scale)); canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height); bitmap.close();
+  const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.82));
+  if(!blob || blob.size > 4_000_000) throw new Error('The compressed photo is still too large. Try a closer crop.');
+  const dataUrl = await new Promise((resolve,reject) => { const reader=new FileReader(); reader.onload=()=>resolve(reader.result); reader.onerror=reject; reader.readAsDataURL(blob); });
+  return {base64:dataUrl.split(',')[1], mediaType:'image/jpeg'};
 }
 
 document.getElementById('pantryPhotoInput').addEventListener('change', async (e) => {
@@ -1677,18 +1099,19 @@ document.getElementById('pantryPhotoInput').addEventListener('change', async (e)
   resultsWrap.innerHTML = '';
   status.textContent = 'Reading the photo…';
   try {
-    const base64 = await fileToBase64(file);
+    const prepared = await preparePantryPhoto(file);
     const resp = await fetch(`${SUPABASE_URL}/functions/v1/scan-pantry-photo`, {
       method: 'POST',
       headers: { 'Content-Type':'application/json', 'Authorization':'Bearer ' + session.access_token },
-      body: JSON.stringify({ imageBase64: base64, mediaType: file.type || 'image/jpeg' })
+      body: JSON.stringify({ imageBase64: prepared.base64, mediaType: prepared.mediaType })
     });
     const data = await resp.json();
     if(!resp.ok){ status.textContent = 'Scan failed: ' + (data.error || resp.status); return; }
     let raw = (data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n').trim();
     raw = raw.replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
     const parsed = JSON.parse(raw);
-    const items = parsed.items || [];
+    if(!parsed || !Array.isArray(parsed.items)) throw new Error('The scan returned an invalid result.');
+    const items = parsed.items.slice(0, 50).filter(it => it && typeof it.name === 'string' && it.name.trim() && it.name.length <= 200 && ['high','medium','low'].includes(it.confidence));
     if(!items.length){ status.textContent = "Couldn't make out any items in that photo, try a closer, better-lit shot."; return; }
     status.textContent = `Found ${items.length} possible item(s), review and confirm each before it saves:`;
     items.forEach(it => resultsWrap.appendChild(buildScanResultRow(it)));
@@ -1705,18 +1128,19 @@ function buildScanResultRow(it){
   row.appendChild(el('div', {style:'font-weight:600;'}, [document.createTextNode(it.name), conf]));
   row.appendChild(el('div', {class:'hint', text: `AI's guess: ${it.estimatedQuantity || 'not given'}${it.unit ? ' '+it.unit : ''}, confirm a number below`}));
   const inputRow = el('div', {class:'row', style:'margin-top:8px;'});
-  const nameInput = el('input', {type:'text', style:'flex:2;'}); nameInput.value = it.name;
+  const nameInput = el('input', {type:'text', 'aria-label':'Scanned item name', style:'flex:2;'}); nameInput.value = it.name;
   const numericGuess = parseFloat(it.estimatedQuantity);
-  const qtyInput = el('input', {type:'number', step:'0.1', min:'0', placeholder:'qty', style:'width:80px;'});
+  const qtyInput = el('input', {type:'number', step:'0.1', min:'0', 'aria-label':'Scanned item quantity', placeholder:'qty', style:'width:80px;'});
   qtyInput.value = isNaN(numericGuess) ? '' : numericGuess;
-  const unitInput = el('input', {type:'text', style:'width:70px;'}); unitInput.value = it.unit||'';
-  const expInput = el('input', {type:'text', placeholder:'yyyy-mm-dd', style:'width:120px;'}); expInput.value = it.expiryDateGuess||'';
+  const unitInput = el('input', {type:'text', 'aria-label':'Scanned item unit', style:'width:70px;'}); unitInput.value = it.unit||'';
+  const expInput = el('input', {type:'date', 'aria-label':'Scanned item expiry date', style:'width:150px;'}); expInput.value = /^\d{4}-\d{2}-\d{2}$/.test(it.expiryDateGuess||'') ? it.expiryDateGuess : '';
   inputRow.appendChild(nameInput); inputRow.appendChild(qtyInput); inputRow.appendChild(unitInput); inputRow.appendChild(expInput);
   row.appendChild(inputRow);
   const addBtn = el('button', {class:'btn ghost small', type:'button', text:'Add to pantry', style:'margin-top:8px;'});
   addBtn.addEventListener('click', async () => {
     if(!qtyInput.value.trim()){ qtyInput.focus(); qtyInput.style.borderColor = 'var(--warn)'; return; }
     const quantity = parseFloat(qtyInput.value);
+    if(!Number.isFinite(quantity) || quantity < 0 || !nameInput.value.trim()){ showToast('Enter a valid item name and non-negative quantity', true); return; }
     const { data, error } = await supabase.from('pantry_items').insert({
       household_id: household.id, name: nameInput.value.trim(), quantity, unit: unitInput.value.trim()||null,
       expiry_date: expInput.value.trim()||null, source:'photo'
@@ -1803,15 +1227,10 @@ document.getElementById('deductCancelBtn').addEventListener('click', () => {
 document.getElementById('deductApplyBtn').addEventListener('click', async () => {
   if(!deductContext) return;
   const ticked = [...document.querySelectorAll('#deductRows input[type=checkbox]')].filter(c => c.checked).map(c => deductContext.proposals[Number(c.dataset.idx)]);
-  const applied = [];
-  for(const p of ticked){
-    const previousQuantity = p.item.quantity;
-    const newQty = Math.max(0, previousQuantity - p.deduct);
-    const { error } = await safeDb(supabase.from('pantry_items').update({ quantity: newQty, updated_at: new Date().toISOString() }).eq('id', p.item.id), 'Could not update stock for ' + p.item.name);
-    if(error) continue;
-    p.item.quantity = newQty;
-    applied.push({ id: p.item.id, previousQuantity });
-  }
+  const applied = ticked.map(p => ({id:p.item.id, previousQuantity:p.item.quantity, quantity:Math.max(0,p.item.quantity-p.deduct)}));
+  const { error } = await safeDb(supabase.rpc('set_pantry_quantities', {p_changes:applied.map(d => ({id:d.id,quantity:d.quantity}))}), 'Could not update pantry stock');
+  if(error) return;
+  applied.forEach(d => { const item=pantryItems.find(p=>p.id===d.id); if(item) item.quantity=d.quantity; });
   renderPantryList(); renderShoppingNeeded(); renderExpiringPanel();
   document.getElementById('deductModal').classList.add('hidden');
   if(applied.length) showToast(`Stock updated for ${applied.length} item(s)`);
@@ -1825,126 +1244,36 @@ function openLeftoverModal(recipe){
 }
 document.querySelectorAll('#leftoverChips .chip').forEach(chip => {
   chip.addEventListener('click', async () => {
-    const cookedRecipe = leftoverRecipeContext;
-    if(cookedRecipe){
+    if(leftoverRecipeContext){
       await safeDb(supabase.from('leftovers').insert({
-        household_id: household.id, recipe_id: cookedRecipe.id || null,
-        recipe_title: cookedRecipe.title, amount: chip.dataset.amt
+        household_id: household.id, recipe_id: leftoverRecipeContext.id || null,
+        recipe_title: leftoverRecipeContext.title, amount: chip.dataset.amt
       }), 'Could not log the leftovers');
     }
     document.getElementById('leftoverModal').classList.add('hidden');
     loadLeftovers();
-    if(cookedRecipe?.id) openCookLog(cookedRecipe);
   });
 });
-document.getElementById('skipLeftoverBtn').addEventListener('click', () => { const cookedRecipe=leftoverRecipeContext; document.getElementById('leftoverModal').classList.add('hidden'); if(cookedRecipe?.id)openCookLog(cookedRecipe); });
+document.getElementById('skipLeftoverBtn').addEventListener('click', () => document.getElementById('leftoverModal').classList.add('hidden'));
 
 
 async function loadFavourites(){
   const body = document.getElementById('favouritesBody');
-  const { data, error } = await safeDb(supabase.from('recipes').select('*, recipe_ratings(*), recipe_cooks(*), recipe_versions(*), recipe_collection_items(collection_id)').eq('household_id', household.id).order('generated_at', {ascending:false}).limit(500), 'Could not load your cookbook');
+  const { data, error } = await safeDb(supabase.from('recipes').select('*').eq('household_id', household.id).eq('is_favourite', true).order('generated_at', {ascending:false}), 'Could not load favourites');
   if(error) return;
-  cookbookRecipes = data || [];
-  await Promise.all([preloadTagsForRecipes(cookbookRecipes.map(r => r.id)), loadCollections()]);
-  renderCookbook(); renderKitchenDashboard();
+  body.innerHTML = '';
+  if(!data || !data.length){ body.appendChild(el('div', {class:'panel', text:'No favourites saved yet.'})); return; }
+  await preloadTagsForRecipes(data.map(r => r.id));
+  data.forEach(r => body.appendChild(buildRecipeCard(r, [])));
 }
-function escapeHtml(value){ return String(value??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
-
-let cookbookRecipes = [], cookbookCollection = '', cookLogTarget = null, versionTarget = null;
-function myRating(r){ return (r.recipe_ratings||[]).find(x => x.profile_id === session.user.id) || {}; }
-function cooksFor(r){ return (r.recipe_cooks||[]).sort((a,b) => new Date(b.cooked_at)-new Date(a.cooked_at)); }
-function avgRating(r){ const xs=(r.recipe_ratings||[]).map(x=>x.taste).filter(Boolean); return xs.length ? xs.reduce((a,b)=>a+b,0)/xs.length : 0; }
-function canCookNow(r){ return (r.ingredients||[]).every(i => pantryItems.some(p => p.quantity > 0 && namesMatch(i.item,p.name))); }
-function euroCost(r){ return computeCost(r.ingredients||[]).total; }
-
-function renderCookbook(){
-  const body=document.getElementById('favouritesBody'); body.innerHTML='';
-  const q=document.getElementById('cookbookSearch').value.trim().toLowerCase();
-  const status=document.getElementById('cookbookStatus').value;
-  const pantryOnly=document.getElementById('cookbookPantryOnly').checked;
-  let rows=cookbookRecipes.filter(r => {
-    const rating=myRating(r), hay=[r.title,r.description,r.cuisine,rating.comment,...(r.ingredients||[]).map(i=>i.item),...cooksFor(r).map(c=>c.comment)].filter(Boolean).join(' ').toLowerCase();
-    return (!q || hay.includes(q)) && (!status || (status==='favourite' ? r.is_favourite : r.library_status===status)) && (!pantryOnly || canCookNow(r)) && (!cookbookCollection || (r.recipe_collection_items||[]).some(x=>x.collection_id===cookbookCollection));
-  });
-  const sort=document.getElementById('cookbookSort').value;
-  rows.sort((a,b)=> sort==='rating' ? avgRating(b)-avgRating(a) : sort==='cooked' ? cooksFor(b).length-cooksFor(a).length : sort==='fast' ? (a.total_time_minutes||999)-(b.total_time_minutes||999) : sort==='cheap' ? euroCost(a)-euroCost(b) : sort==='forgotten' ? ((cooksFor(a)[0]?.cooked_at||'')>(cooksFor(b)[0]?.cooked_at||'')?1:-1) : new Date(b.generated_at)-new Date(a.generated_at));
-  document.getElementById('cookbookStats').innerHTML=`<span class="stat-tile"><b>${cookbookRecipes.length}</b>recipes</span><span class="stat-tile"><b>${cookbookRecipes.reduce((n,r)=>n+cooksFor(r).length,0)}</b>cooks</span><span class="stat-tile"><b>${cookbookRecipes.filter(r=>r.library_status==='make_again').length}</b>make again</span><span class="stat-tile"><b>${rows.length}</b>showing</span>`;
-  if(!rows.length){ body.appendChild(el('div',{class:'panel hint',text:'No recipes match these filters.'})); return; }
-  rows.forEach(r=>body.appendChild(buildCookbookCard(r)));
-  hydrateCookPhotos();
-}
-
-function buildCookbookCard(r){
-  const card=buildRecipeCard(r,[]); card.classList.add('cookbook-card');
-  const top=card.querySelector('.rc-top'), rating=myRating(r), cooks=cooksFor(r), latest=cooks[0];
-  const badges=el('div',{class:'cookbook-badges'});
-  badges.appendChild(el('span',{class:'cookbook-badge',text:avgRating(r)?`★ ${avgRating(r).toFixed(1)} household`:'Not rated'}));
-  badges.appendChild(el('span',{class:'cookbook-badge',text:`Cooked ${cooks.length}×`}));
-  if(latest) badges.appendChild(el('span',{class:'cookbook-badge',text:'Last '+new Date(latest.cooked_at).toLocaleDateString('en-IE')}));
-  if(canCookNow(r)) badges.appendChild(el('span',{class:'cookbook-badge',text:'✓ Pantry ready'}));
-  top.insertBefore(badges,top.querySelector('.rc-actions'));
-  if(rating.comment) top.insertBefore(el('div',{class:'cookbook-comment',text:'Your note: '+rating.comment}),top.querySelector('.rc-actions'));
-  if(latest?.comment) top.insertBefore(el('div',{class:'cookbook-comment',text:'Latest cook: '+latest.comment}),top.querySelector('.rc-actions'));
-  const actions=top.querySelector('.rc-actions');
-  const status=el('select',{title:'Cookbook status'}); ['want_to_try','cooked','make_again','avoid'].forEach(v=>status.appendChild(el('option',{value:v,text:v.replaceAll('_',' ')}))); status.value=r.library_status||'want_to_try';
-  status.addEventListener('change',async()=>{ const {error}=await safeDb(supabase.from('recipes').update({library_status:status.value}).eq('id',r.id),'Could not update cookbook status'); if(!error){r.library_status=status.value;renderCookbook();}}); actions.appendChild(status);
-  const log=el('button',{class:'btn small',type:'button',text:cooks.length?'Log another cook':'Log first cook'}); log.addEventListener('click',()=>openCookLog(r)); actions.appendChild(log);
-  const again=el('button',{class:'btn ghost small',type:'button',text:'Cook again'}); again.addEventListener('click',()=>smartCookAgain(r)); actions.appendChild(again);
-  const version=el('button',{class:'btn ghost small',type:'button',text:'Our version'}); version.addEventListener('click',()=>openVersion(r)); actions.appendChild(version);
-  const share=el('button',{class:'btn ghost small',type:'button',text:'Share'}); share.addEventListener('click',()=>shareRecipe(r)); actions.appendChild(share);
-  const collect=el('button',{class:'btn ghost small',type:'button',text:'Add to collection'}); collect.addEventListener('click',()=>addToCollection(r)); actions.appendChild(collect);
-  if(cooks.length){ const diary=el('details'); diary.appendChild(el('summary',{text:`Cooking diary (${cooks.length})`})); cooks.forEach(c=>{diary.appendChild(el('div',{class:'cookbook-comment',text:`${new Date(c.cooked_at).toLocaleDateString('en-IE')} · ${c.taste?'★'.repeat(c.taste):'unrated'} · ${c.comment||'No note'}${c.substitutions?' · Swapped: '+c.substitutions:''}`}));if(c.photo_url){const img=el('img',{class:'cookbook-photo',alt:'Photo from this cook'});img.dataset.storagePath=c.photo_url;diary.appendChild(img);}}); top.appendChild(diary); }
-  return card;
-}
-
-async function hydrateCookPhotos(){for(const img of document.querySelectorAll('img[data-storage-path]')){const {data}=await supabase.storage.from('recipe-photos').createSignedUrl(img.dataset.storagePath,900);if(data?.signedUrl)img.src=data.signedUrl;}}
-
-['cookbookSearch','cookbookStatus','cookbookSort','cookbookPantryOnly'].forEach(id=>document.getElementById(id).addEventListener(id==='cookbookSearch'?'input':'change',renderCookbook));
-document.getElementById('cookbookSurprise').addEventListener('click',()=>{ const pool=cookbookRecipes.filter(r=>r.library_status!=='avoid'); if(pool.length) smartCookAgain(pool[Math.floor(Math.random()*pool.length)]); });
-
-async function smartCookAgain(r){
-  const list=await ensureDraftList('Cook again: '+r.title,'recipe'); if(!list)return;
-  const missing=(r.ingredients||[]).map(i=>ingredientToListItem(i,r.id)).filter(i=>i.status!=='already_have');
-  if(missing.length) await addItemsToList(list,missing);
-  showToast(missing.length?`${missing.length} missing ingredient(s) added to ${list.title}`:'Everything is already in Koskas');
-  startCooking(r);
-}
-
-async function shareRecipe(r){
-  const text=`${r.title}\n\nIngredients\n${(r.ingredients||[]).map(i=>`• ${i.amount||''} ${i.unit||''} ${i.item}`.trim()).join('\n')}\n\nMethod\n${(r.steps||[]).map((s,i)=>`${i+1}. ${typeof s==='string'?s:s.text}`).join('\n')}\n\nOur tip: ${myRating(r).comment||'No private notes included.'}`;
-  if(navigator.share){ await navigator.share({title:r.title,text}); } else { await navigator.clipboard.writeText(text); showToast('Recipe copied to clipboard'); }
-}
-
-function openCookLog(r){ cookLogTarget=r; document.getElementById('cookLogTitle').textContent='Log '+r.title; document.getElementById('cookServingsMade').value=r.servings||2; document.getElementById('cookServingsEaten').value=r.servings||2; const stars=document.getElementById('cookStars'); stars.innerHTML=''; for(let i=1;i<=5;i++){const b=el('button',{class:'chip',type:'button',text:'★ '+i});b.addEventListener('click',()=>{cookLogTarget._cookTaste=i;[...stars.children].forEach((x,j)=>x.classList.toggle('selected',j<i));});stars.appendChild(b);} document.getElementById('cookLogDialog').showModal(); }
-document.getElementById('saveCookLog').addEventListener('click',async()=>{
-  const made=Number(document.getElementById('cookServingsMade').value)||null,eaten=Number(document.getElementById('cookServingsEaten').value)||0,file=document.getElementById('cookPhoto').files[0]; let photo=null;
-  if(file){ const path=`${household.id}/${session.user.id}/${crypto.randomUUID()}-${file.name.replace(/[^a-z0-9.]/gi,'-')}`; const {error}=await supabase.storage.from('recipe-photos').upload(path,file); if(error){showToast('Photo upload failed: '+error.message,true);return;} photo=path; }
-  const row={recipe_id:cookLogTarget.id,household_id:household.id,profile_id:session.user.id,servings_made:made,servings_eaten:eaten,taste:cookLogTarget._cookTaste||null,actual_minutes:Number(document.getElementById('cookActualMinutes').value)||null,actual_cost:Number(document.getElementById('cookActualCost').value)||null,comment:document.getElementById('cookComment').value.trim()||null,substitutions:document.getElementById('cookSubstitutions').value.trim()||null,would_make_again:document.getElementById('cookAgain').checked,stated_time_accurate:document.getElementById('cookTimeAccurate').checked,portions_enough:document.getElementById('cookPortionsEnough').checked,photo_url:photo};
-  const {data,error}=await safeDb(supabase.from('recipe_cooks').insert(row).select().single(),'Could not save cooking diary'); if(error)return;
-  await supabase.from('recipes').update({library_status:row.would_make_again?'make_again':'cooked'}).eq('id',cookLogTarget.id);
-  if(made>eaten) await safeDb(supabase.from('leftovers').insert({household_id:household.id,recipe_id:cookLogTarget.id,recipe_title:cookLogTarget.title,amount:`${made-eaten} serving(s)`}),'Could not log leftover portions');
-  document.getElementById('cookLogDialog').close(); showToast('Cook saved to your diary'); await loadFavourites(); loadLeftovers();
-});
-
-function openVersion(r){versionTarget=r;document.getElementById('versionName').value='Our '+r.title;document.getElementById('versionIngredients').value=(r.ingredients||[]).map(i=>[i.amount,i.unit,i.item].filter(Boolean).join(' ')).join('\n');document.getElementById('versionSteps').value=(r.steps||[]).map(s=>typeof s==='string'?s:s.text).join('\n');document.getElementById('versionDialog').showModal();}
-document.getElementById('saveVersion').addEventListener('click',async()=>{const name=document.getElementById('versionName').value.trim();if(!name)return;const ingredients=document.getElementById('versionIngredients').value.split('\n').filter(Boolean).map(item=>({item})),steps=document.getElementById('versionSteps').value.split('\n').filter(Boolean);if(document.getElementById('versionPreferred').checked)await supabase.from('recipe_versions').update({is_preferred:false}).eq('recipe_id',versionTarget.id);const {error}=await safeDb(supabase.from('recipe_versions').insert({recipe_id:versionTarget.id,household_id:household.id,created_by:session.user.id,name,ingredients,steps,servings:versionTarget.servings,notes:document.getElementById('versionNotes').value.trim()||null,is_preferred:document.getElementById('versionPreferred').checked}),'Could not save recipe version');if(!error){document.getElementById('versionDialog').close();showToast('Recipe version saved');loadFavourites();}});
-
-let cookbookCollections=[];
-async function loadCollections(){const {data}=await safeDb(supabase.from('recipe_collections').select('*').eq('household_id',household.id).order('name'),'Could not load collections');cookbookCollections=data||[];const wrap=document.getElementById('collectionChips');wrap.innerHTML='';const all=el('button',{class:'chip'+(!cookbookCollection?' selected':''),type:'button',text:'All'});all.addEventListener('click',()=>{cookbookCollection='';loadCollections();renderCookbook();});wrap.appendChild(all);cookbookCollections.forEach(c=>{const b=el('button',{class:'chip'+(cookbookCollection===c.id?' selected':''),type:'button',text:(c.emoji||'📚')+' '+c.name});b.addEventListener('click',()=>{cookbookCollection=c.id;loadCollections();renderCookbook();});wrap.appendChild(b);});}
-document.getElementById('newCollectionBtn').addEventListener('click',async()=>{const name=prompt('Collection name');if(!name)return;const {error}=await safeDb(supabase.from('recipe_collections').insert({household_id:household.id,created_by:session.user.id,name}),'Could not create collection');if(!error)loadCollections();});
-async function addToCollection(r){if(!cookbookCollections.length){showToast('Create a collection first',true);return;}const name=prompt('Add to which collection?\n'+cookbookCollections.map((c,i)=>`${i+1}. ${c.name}`).join('\n'));const idx=Number(name)-1,c=cookbookCollections[idx]||cookbookCollections.find(x=>x.name.toLowerCase()===String(name).toLowerCase());if(!c)return;const {error}=await safeDb(supabase.from('recipe_collection_items').upsert({collection_id:c.id,recipe_id:r.id,added_by:session.user.id}),'Could not add to collection');if(!error){showToast('Added to '+c.name);loadFavourites();}}
-
-function renderKitchenDashboard(){const wrap=document.getElementById('kitchenDashboardBody'),exp=pantryItems.filter(i=>{const d=daysUntil(i.expiry_date);return d!==null&&d>=0&&d<=3;}),low=lowStockItems(),allCooks=cookbookRecipes.flatMap(r=>cooksFor(r)),five=cookbookRecipes.filter(r=>avgRating(r)>=4.5).sort((a,b)=>(cooksFor(a)[0]?.cooked_at||'').localeCompare(cooksFor(b)[0]?.cooked_at||''))[0],cost=allCooks.filter(c=>c.actual_cost!=null).slice(0,7).reduce((n,c)=>n+Number(c.actual_cost),0),badges=[allCooks.length>=1?'First cook logged':null,allCooks.length>=20?'20-dinner explorer':null,exp.length===0?'Zero-waste watch':null,cookbookRecipes.filter(r=>canCookNow(r)).length>=5?'Pantry pro':null].filter(Boolean);wrap.innerHTML=`<div class="row"><span class="stat-tile"><b>${exp.length}</b>expiring soon</span><span class="stat-tile"><b>${low.length}</b>low stock</span><span class="stat-tile"><b>€${cost.toFixed(2)}</b>recent actual cost</span></div>${five?`<p class="hint">Rediscover a household favourite: <b>${escapeHtml(five.title)}</b> (${avgRating(five).toFixed(1)}★).</p>`:''}<p class="hint">${cookbookRecipes.filter(r=>canCookNow(r)).length} saved recipe(s) can be made entirely from Koskas right now.</p><div class="cookbook-badges">${badges.map(x=>`<span class="cookbook-badge">🏅 ${x}</span>`).join('')}</div>`;}
 
 // ---------------- RATING MODAL ----------------
 let ratingTarget = null;
 const RATING_CATS = [['taste','Taste'],['convenience','Convenience'],['cost','Cost'],['serving_size','Serving size']];
-async function openRatingModal(recipe){
+function openRatingModal(recipe){
   ratingTarget = recipe;
   const wrap = document.getElementById('starRows'); wrap.innerHTML = '';
-  let existing=(recipe.recipe_ratings||[]).find(x=>x.profile_id===session.user.id);
-  if(!existing){ const {data}=await safeDb(supabase.from('recipe_ratings').select('*').eq('recipe_id',recipe.id).eq('profile_id',session.user.id).maybeSingle(),'Could not load your rating'); existing=data||{}; }
-  ratingTarget._ratings = {...existing};
+  ratingTarget._ratings = {};
   RATING_CATS.forEach(([key,label]) => {
     const row = el('div', {class:'star-row'});
     row.appendChild(el('div', {class:'cat', text:label}));
@@ -1955,7 +1284,6 @@ async function openRatingModal(recipe){
         ratingTarget._ratings[key] = i;
         [...stars.children].forEach((el2,idx) => el2.classList.toggle('on', idx < i));
       });
-      s.classList.toggle('on', i <= (existing[key]||0));
       stars.appendChild(s);
     }
     row.appendChild(stars);
@@ -1963,7 +1291,7 @@ async function openRatingModal(recipe){
   });
   const tagWrap = document.getElementById('ratingQuickTags'); tagWrap.innerHTML = '';
   tagWrap.appendChild(buildQuickTagChips(recipe.id));
-  document.getElementById('ratingComment').value = existing.comment||'';
+  document.getElementById('ratingComment').value = '';
   document.getElementById('ratingModal').classList.remove('hidden');
 }
 document.getElementById('cancelRatingBtn').addEventListener('click', () => document.getElementById('ratingModal').classList.add('hidden'));
@@ -2001,9 +1329,8 @@ function printRecipe(r){
 }
 
 // ---------------- COOKING MODE ----------------
-let wakeLock = null, ckSteps = [], ckIndex = 0, ckTimerInterval = null, ckRecipe = null;
+let wakeLock = null, ckSteps = [], ckIndex = 0, ckTimerInterval = null;
 async function startCooking(r){
-  ckRecipe = r;
   ckSteps = (r.steps||[]).map(s => typeof s === 'string' ? {text:s, timerSeconds:null} : s);
   ckIndex = 0;
   document.getElementById('ckTitle').textContent = r.title||'';
@@ -2044,18 +1371,13 @@ function renderCookingStep(){
 }
 document.getElementById('ckPrevBtn').addEventListener('click', () => { if(ckIndex>0){ ckIndex--; renderCookingStep(); }});
 document.getElementById('ckNextBtn').addEventListener('click', () => {
-  if(ckIndex < ckSteps.length-1){ ckIndex++; renderCookingStep(); } else { const finished=ckRecipe; exitCooking().then(()=>{if(finished?.id)openCookLog(finished);}); }
+  if(ckIndex < ckSteps.length-1){ ckIndex++; renderCookingStep(); } else { exitCooking(); }
 });
 document.getElementById('exitCookingBtn').addEventListener('click', exitCooking);
-document.getElementById('ckReadBtn').addEventListener('click',()=>{speechSynthesis.cancel();speechSynthesis.speak(new SpeechSynthesisUtterance(document.getElementById('ckText').textContent));});
-let ckRecognition=null;
-document.getElementById('ckVoiceBtn').addEventListener('click',()=>{const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){showToast('Voice control is not supported in this browser',true);return;}ckRecognition=new SR();ckRecognition.continuous=true;ckRecognition.onresult=e=>{const t=e.results[e.results.length-1][0].transcript.toLowerCase();if(t.includes('next'))document.getElementById('ckNextBtn').click();else if(t.includes('back')||t.includes('previous'))document.getElementById('ckPrevBtn').click();else if(t.includes('read'))document.getElementById('ckReadBtn').click();else if(t.includes('timer'))document.querySelector('#ckTimerControls button')?.click();};ckRecognition.start();showToast('Listening for next, back, read or timer');});
 async function exitCooking(){
   clearInterval(ckTimerInterval);
   if(wakeLock){ try{ await wakeLock.release(); }catch(e){} wakeLock = null; }
   document.getElementById('cookingOverlay').classList.add('hidden');
-  if(ckRecognition){ckRecognition.stop();ckRecognition=null;} speechSynthesis.cancel();
-  ckRecipe = null;
 }
 document.addEventListener('visibilitychange', async () => {
   if(document.visibilityState === 'visible' && !document.getElementById('cookingOverlay').classList.contains('hidden') && 'wakeLock' in navigator){
@@ -2237,14 +1559,8 @@ async function addItemsToList(list, items){
     byKey.set(key, row); // later items in this same batch can still merge into it before it's inserted
   }
 
-  for(const u of toUpdate){
-    const { error } = await safeDb(supabase.from('shopping_list_items').update({ quantity: u.quantity, unit: u.unit, quantity_text: u.quantity_text, pantry_item_id: u.pantry_item_id }).eq('id', u.id), 'Could not update a merged item');
-    if(error) return false;
-  }
-  if(toInsert.length){
-    const { error } = await safeDb(supabase.from('shopping_list_items').insert(toInsert), 'Could not add items to the list');
-    if(error) return false;
-  }
+  const { error } = await safeDb(supabase.rpc('apply_shopping_list_changes', {p_list_id:list.id,p_updates:toUpdate,p_inserts:toInsert}), 'Could not apply shopping-list changes');
+  if(error) return false;
   return true;
 }
 
@@ -2583,22 +1899,22 @@ function buildListItemRow(item){
     item[field] = value;
   };
   const nameWrap = el('span', {class:'sl-name', style:'flex:2; min-width:130px;'});
-  const nameInput = el('input', {type:'text'}); nameInput.value = item.item_name;
+  const nameInput = el('input', {type:'text', 'aria-label':'Item name'}); nameInput.value = item.item_name;
   nameInput.addEventListener('change', () => saveField('item_name', nameInput.value.trim() || item.item_name, nameInput));
   nameWrap.appendChild(nameInput);
   row.appendChild(nameWrap);
 
-  const qtyInput = el('input', {type:'number', step:'0.1', min:'0', placeholder:'qty', style:'width:70px;'});
+  const qtyInput = el('input', {type:'number', step:'0.1', min:'0', 'aria-label':'Item quantity', placeholder:'qty', style:'width:70px;'});
   if(item.quantity != null) qtyInput.value = item.quantity;
   qtyInput.addEventListener('change', () => saveField('quantity', qtyInput.value === '' ? null : parseFloat(qtyInput.value), qtyInput));
   row.appendChild(qtyInput);
 
-  const unitInput = el('input', {type:'text', placeholder:'unit', style:'width:64px;'});
+  const unitInput = el('input', {type:'text', 'aria-label':'Item unit', placeholder:'unit', style:'width:64px;'});
   unitInput.value = item.unit || '';
   unitInput.addEventListener('change', () => saveField('unit', unitInput.value.trim() || null, unitInput));
   row.appendChild(unitInput);
 
-  const notesInput = el('input', {type:'text', placeholder:'notes / substitutions, e.g. gluten-free only', style:'flex:3; min-width:170px;'});
+  const notesInput = el('input', {type:'text', 'aria-label':'Item notes or substitutions', placeholder:'notes / substitutions, e.g. gluten-free only', style:'flex:3; min-width:170px;'});
   notesInput.value = item.notes || '';
   notesInput.addEventListener('change', () => saveField('notes', notesInput.value.trim() || null, notesInput));
   row.appendChild(notesInput);
@@ -2707,8 +2023,9 @@ document.getElementById('slCopyBtn').addEventListener('click', async () => {
 document.getElementById('slDownloadBtn').addEventListener('click', () => {
   if(!currentList) return;
   const blob = new Blob([buildListExportText()], {type:'text/plain'});
-  const a = el('a', {href: URL.createObjectURL(blob), download: (currentList.title||'shopping-list').replace(/[^a-z0-9]+/gi,'-').toLowerCase() + '.txt'});
-  document.body.appendChild(a); a.click(); a.remove();
+  const url = URL.createObjectURL(blob);
+  const a = el('a', {href:url, download: (currentList.title||'shopping-list').replace(/[^a-z0-9]+/gi,'-').toLowerCase() + '.txt'});
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 0);
 });
 document.getElementById('slPrintBtn').addEventListener('click', () => {
   if(!currentList) return;
@@ -2894,26 +2211,14 @@ document.getElementById('mealSaveBtn').addEventListener('click', async () => {
     recipe_id: recipeId, manual_title: manual || (leftoverId ? leftoverTitle : null),
     servings, notes, use_leftovers: !!leftoverId, leftover_id: leftoverId
   };
-  const { data, error } = await safeDb(supabase.from('meal_plan_items').insert(row).select('*, recipes(id,title,servings,ingredients,steps)').single(), 'Could not add the meal');
-  if(error) return;
-  mpItems.push(data);
+  let followup=null;
   if(cookTwice){
-    const nextDay = new Date(mealModalContext.dateStr + 'T00:00:00'); nextDay.setDate(nextDay.getDate() + 1);
-    const nextDayStr = isoDate(nextDay);
-    // The follow-up meal may fall in next week's plan
-    let plan2 = plan;
-    if(nextDayStr > isoDate(new Date(new Date(mpWeekStart).setDate(mpWeekStart.getDate() + 6)))){
-      const { data: p2 } = await safeDb(supabase.from('meal_plans').upsert({ household_id: household.id, week_start: isoDate(mondayOf(nextDay)) }, { onConflict:'household_id,week_start' }).select().single(), 'Could not create next week\'s plan');
-      if(p2) plan2 = p2;
-    }
-    const { data: second } = await safeDb(supabase.from('meal_plan_items').insert({
-      meal_plan_id: plan2.id, household_id: household.id,
-      meal_date: nextDayStr, meal_slot: 'lunch',
-      recipe_id: recipeId, manual_title: manual, servings,
-      use_leftovers: true, notes: 'Cook once, eat twice — leftovers from the day before'
-    }).select('*, recipes(id,title,servings,ingredients,steps)').single(), 'Could not add the leftover meal');
-    if(second && second.meal_date >= isoDate(mpWeekStart)) mpItems.push(second);
+    const nextDay=new Date(mealModalContext.dateStr+'T00:00:00'); nextDay.setDate(nextDay.getDate()+1);
+    followup={week_start:isoDate(mondayOf(nextDay)),meal_date:isoDate(nextDay),meal_slot:'lunch',recipe_id:recipeId,manual_title:manual,servings};
   }
+  const { error } = await safeDb(supabase.rpc('add_meal_with_optional_leftover',{p_meal:row,p_followup:followup}), 'Could not add the meal');
+  if(error) return;
+  await loadMealPlan();
   document.getElementById('mealModal').classList.add('hidden');
   renderMealPlan();
 });
@@ -3239,6 +2544,3 @@ if('serviceWorker' in navigator){
 }
 
 renderOnHand();
-</script>
-</body>
-</html>

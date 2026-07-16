@@ -25,7 +25,11 @@ declare
   target_id uuid;
   recent_attempts int;
 begin
-  delete from public.household_join_attempts where attempted_at < now() - interval '1 hour';
+  if auth.uid() is null then raise exception 'Authentication required'; end if;
+  -- Serialize attempts for this user so concurrent requests cannot race past the limit.
+  perform pg_advisory_xact_lock(hashtextextended(auth.uid()::text || ':household-join', 0));
+  delete from public.household_join_attempts
+    where user_id = auth.uid() and attempted_at < now() - interval '1 hour';
 
   select count(*) into recent_attempts
     from public.household_join_attempts
